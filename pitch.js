@@ -51,5 +51,5 @@
 
   const api = { yin, median, FMIN, FMAX };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
-  else root.PitchTrace = api;
+  else root.PitchTrace = Object.assign(root.PitchTrace || {}, api);
 })(typeof window !== 'undefined' ? window : globalThis);

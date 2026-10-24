@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0e1417" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#f2f5f4" media="(prefers-color-scheme: light)">
-<meta name="description" content="Live pitch tuner with a scrolling pitch trace, for practising choir parts.">
+<meta name="description" content="Pitch tuner with a scrolling pitch trace and MIDI scores, for practising choir parts.">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Pitch Trace">
@@ -26,7 +26,7 @@
     <div class="note" id="note">&mdash;</div>
     <div class="side">
       <div class="cents" id="cents">&nbsp;</div>
-      <div class="verdict" id="verdict">Sing a note</div>
+      <div class="verdict" id="verdict">Microphone off</div>
       <div class="hz" id="hz">&nbsp;</div>
     </div>
   </section>
@@ -45,16 +45,42 @@
 
   <div class="plot" id="plot">
     <canvas id="cv"></canvas>
-    <div class="empty" id="empty"><p>Press Start and sing a note. Your pitch scrolls left; the right edge is now.</p></div>
+    <div class="empty" id="empty"><p>Press Start and sing a note. Your pitch scrolls left; the right edge is now. To practise a part, load a MIDI file.</p></div>
   </div>
 
-  <p class="msg" id="msg" hidden></p>
+  <section class="transport" id="transport" aria-label="Playback" hidden>
+    <div class="row">
+      <button class="btn primary" id="play" type="button" data-on="false">Play</button>
+      <button class="btn" id="restart" type="button">Restart</button>
+      <label class="field">Speed
+        <select id="speed">
+          <option value="0.5">50%</option>
+          <option value="0.7">70%</option>
+          <option value="0.85">85%</option>
+          <option value="1" selected>100%</option>
+        </select>
+      </label>
+      <span class="pos" id="posText">Bar 1 &middot; 0:00 / 0:00</span>
+    </div>
+    <input type="range" id="seek" min="0" max="1" step="0.01" value="0" aria-label="Position in the song">
+  </section>
+
+  <p class="msg" id="msg" role="alert" hidden></p>
 
   <div class="controls">
-    <button class="go" id="toggle" data-on="false">Start</button>
+    <button class="go" id="toggle" type="button" data-on="false">Start</button>
+    <button class="btn" id="load" type="button">Load MIDI</button>
+    <input type="file" id="file" accept=".mid,.midi,.kar,audio/midi,audio/x-midi" hidden>
+    <label class="field" id="songField" hidden>Song
+      <select id="song"><option value="">Free tuner (no score)</option></select>
+    </label>
+    <label class="field" id="partField" hidden>Part
+      <select id="part"></select>
+    </label>
     <label class="field">Voice range
       <select id="range">
         <option value="auto">Follow me</option>
+        <option value="score" id="scoreRange" disabled hidden>Fit to score</option>
         <option value="soprano">Soprano</option>
         <option value="alto">Alto</option>
         <option value="tenor">Tenor</option>
@@ -65,6 +91,24 @@
     <details class="settings">
       <summary>Settings</summary>
       <div class="grid">
+        <label class="field">Count-in
+          <input type="checkbox" id="countIn" checked>
+        </label>
+        <label class="field">Hear my part
+          <input type="checkbox" id="guideMine" checked>
+        </label>
+        <label class="field" id="othersField" hidden>Hear other parts
+          <input type="checkbox" id="guideOthers" checked>
+        </label>
+        <label class="field">Octave
+          <select id="octave">
+            <option value="any">Any octave counts</option>
+            <option value="exact">Exact octave</option>
+          </select>
+        </label>
+        <label class="field" id="pickupField" hidden>Pickup beats
+          <input type="number" id="pickup" min="0" max="16" step="0.5" value="0" inputmode="decimal" style="width:5em">
+        </label>
         <label class="field">A4 =
           <input type="number" id="a4" min="415" max="466" step="1" value="440" inputmode="numeric" style="width:5.5em"> Hz
         </label>
@@ -78,13 +122,16 @@
         <label class="field" style="display:grid;gap:4px">Sensitivity
           <input type="range" id="sens" min="0" max="100" value="50">
         </label>
-        <p class="help">Notes are shown as sounding pitch in equal temperament. Tenor parts are usually written an octave higher than they sound, so a written C4 appears here as C3. Use headphones if you sing along to a backing track, otherwise the track will be picked up as well. Raise sensitivity if quiet notes are missed, lower it if background noise triggers the trace.</p>
+        <button class="btn small" id="removeSong" type="button" hidden>Remove this song</button>
+        <p class="help">Export a MIDI file from MuseScore (File, Export, MIDI) and load it here. Songs stay on this device only; nothing is uploaded. If the song starts with a pickup measure, enter its length in beats so bar numbers match your score. Pitches are sounding pitch in equal temperament. Use headphones with the guide tone, otherwise the microphone hears it too. Raise sensitivity if quiet notes are missed, lower it if background noise triggers the trace.</p>
       </div>
     </details>
   </div>
 </div>
 
 <script src="pitch.js"></script>
+<script src="midi.js"></script>
+<script src="library.js"></script>
 <script src="app.js"></script>
 <script>
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {

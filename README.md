@@ -1,24 +1,43 @@
 # Pitch Trace
 
-A live pitch tuner with a scrolling pitch trace, for practising choir parts. It runs in the browser, needs no server and no account, and can be installed on a phone like an app.
+A pitch trainer for practising choir parts. It runs in the browser, needs no server and no account, and can be installed on a phone like an app.
 
-Your voice is detected with the YIN algorithm and drawn as a line against a semitone grid. The line is green when you are within 15 cents of a note, amber within 30, and red beyond that. A large readout shows the note, the cents sharp or flat and the frequency.
+Your voice is detected with the YIN algorithm and drawn as a line against a semitone grid. Load a MIDI file of your part and the target notes appear on the same grid, scrolling towards you, with the line coloured by how far you are from the note you should be singing: green within 15 cents, amber within 30, red beyond that.
 
 ## Use it
 
 1. Open the published page (see **Hosting**) in Chrome, Edge, Firefox or Safari.
-2. Press **Start** and allow the microphone.
-3. Sing. The right edge of the trace is now.
+2. Press **Start** and allow the microphone, then sing. The right edge of the trace is now. This is the free tuner.
+3. To practise a part, press **Load MIDI** and choose a file. Pick your part if the file has several.
+4. Press **Play**. A one-bar count-in clicks, then the notes of your part scroll in from the right and the guide tone plays them. Sing along and watch the line.
 
 On a phone, use the browser menu and choose **Add to Home screen** or **Install app**. After the first visit it also works offline.
 
-Notes are shown as sounding pitch. Tenor parts are usually written an octave above where they sound, so a written C4 appears as C3. Use headphones when you sing along to a backing track, otherwise the track is picked up too.
+### Getting a MIDI file from MuseScore
+
+Open the score in MuseScore and choose **File, Export, MIDI**. Each voice part becomes its own track, named after the part, with repeats and tempo changes already played out. Songs you load are kept in the browser on that device (nothing is uploaded), so you load each file once per device.
+
+### Controls
+
+| Control | What it does |
+|---|---|
+| Play, Pause, Restart | Starts from the bar before your first entrance. The slider reaches any other point. |
+| Speed | 50% to 100%, for learning difficult passages. The guide tone keeps its pitch. |
+| Part | Which track is yours. The others can be heard as a backing, quieter. |
+| Count-in | One bar of clicks before playback starts. |
+| Octave | "Any octave counts" accepts your note an octave above or below the target. "Exact octave" does not. |
+| Pickup beats | Sets bar 1 after a pickup measure, so bar numbers match your score. MIDI does not store pickups. |
+| Voice range | "Fit to score" frames your part. Other choices frame a voice range, and "Follow me" tracks your voice. |
+
+Pause on a note and sing: the readout shows the cents from that note, so you can check one note at a time.
+
+Notes are shown as sounding pitch. Use headphones with the guide tone, otherwise the microphone hears it too.
 
 ## Hosting
 
 The microphone only works on `https://` pages or on `localhost`. With GitHub Pages:
 
-1. Open the repository's **Settings → Pages**.
+1. Open the repository's **Settings, Pages**.
 2. Under **Build and deployment**, choose **Deploy from a branch**, then branch `main` and folder `/ (root)`.
 3. The app appears at `https://<your-user>.github.io/pitch-trace/` after a minute.
 
@@ -36,21 +55,29 @@ then open `http://localhost:8000`.
 |---|---|
 | `index.html` | Page structure |
 | `styles.css` | Styling, light and dark themes |
-| `pitch.js` | YIN pitch detection (also loaded by the tests) |
-| `app.js` | Microphone, analysis loop, drawing, settings |
+| `pitch.js` | YIN pitch detection |
+| `midi.js` | MIDI file reader: parts, note times in seconds, bar grid |
+| `library.js` | Keeps loaded songs in the browser (IndexedDB) |
+| `app.js` | Microphone, playback, drawing, settings |
 | `manifest.webmanifest` | Makes the page installable |
 | `sw.js` | Service worker for offline use |
 | `icons/` | App icons |
-| `tests/pitch.test.js` | Checks the detector on generated tones |
+| `tests/` | Checks for the detector and the MIDI reader |
 
-Run the tests with `node tests/pitch.test.js`.
+Run the tests with `node tests/pitch.test.js && node tests/midi.test.js`. Score files (`.mid`, `.mscz`) are listed in `.gitignore`, so they are not committed by accident; keep arrangements you do not own out of a public repository.
 
 ## Updating
 
-The service worker fetches fresh files whenever you are online, so a new version appears the next time you open the app. If you rename or remove files, change `CACHE` in `sw.js` and update the `CORE` list.
+The service worker fetches fresh files whenever you are online, so a new version appears the next time you open the app. If you rename, add or remove files, update the `CORE` list in `sw.js` and change `CACHE`.
+
+## Known limits
+
+- Bar numbers assume the first bar starts at the beginning of the file unless you set pickup beats.
+- Playback pauses when the app goes to the background, because browsers slow down timers there.
+- Bluetooth headphones add delay, so your trace can appear a little behind the notes.
 
 ## Roadmap
 
-1. Live tuner with scrolling pitch trace (this version)
-2. Load a MIDI file of your voice part and draw the target notes behind your trace
-3. Play-along mode with a score and a sharp/flat summary
+1. Live tuner with scrolling pitch trace (done)
+2. Load a MIDI file of your voice part and draw the target notes behind your trace (done)
+3. Practice summary after each run (how many notes were in tune, whether you tend flat or sharp), loop a section, and a delay setting for Bluetooth headphones
