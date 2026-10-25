@@ -67,6 +67,7 @@
 
   .readout { display: grid; grid-template-columns: auto 1fr; align-items: center; column-gap: 20px; }
   .note { font-family: var(--mono); font-size: clamp(48px, 12vw, 72px); font-weight: 600; line-height: 1; min-width: 2.6ch; transition: color .15s; }
+  .note[data-long="true"] { font-size: clamp(36px, 9.5vw, 54px); }
   .readout[data-q="idle"] .note { color: var(--grid-strong); }
   .readout[data-q="good"] .note { color: var(--good); }
   .readout[data-q="warn"] .note { color: var(--warn); }

@@ -8,6 +8,10 @@
   const SHARP = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
   const FLAT = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
   const NATURAL_LABEL = ['C', '', 'D', '', 'E', 'F', '', 'G', '', 'A', '', 'B'];
+  // Fixed-do solfège: Do is always C.
+  const SOL_SHARP = ['Do', 'Do#', 'Re', 'Re#', 'Mi', 'Fa', 'Fa#', 'Sol', 'Sol#', 'La', 'La#', 'Si'];
+  const SOL_FLAT = ['Do', 'Reb', 'Re', 'Mib', 'Mi', 'Fa', 'Solb', 'Sol', 'Lab', 'La', 'Sib', 'Si'];
+  const SOL_NATURAL = ['Do', '', 'Re', '', 'Mi', 'Fa', '', 'Sol', '', 'La', '', 'Si'];
   // Visible windows in MIDI note numbers (sounding pitch).
   const RANGES = { soprano: [58, 83], alto: [53, 78], tenor: [46, 71], bass: [38, 64] };
   const GOOD = 15, CLOSE = 30;  // cents
@@ -19,9 +23,9 @@
 
   const state = {
     running: false, a4: 440, windowSec: 12, range: 'auto', sens: 50,
-    speed: 1, countIn: true, guideMine: true, guideOthers: true, octave: 'any', partName: '', agc: false,
+    speed: 1, countIn: true, guideMine: true, guideOthers: true, octave: 'any', partName: '', agc: false, names: 'letters',
   };
-  const PERSIST = ['a4', 'windowSec', 'range', 'sens', 'speed', 'countIn', 'guideMine', 'guideOthers', 'octave', 'partName', 'agc'];
+  const PERSIST = ['a4', 'windowSec', 'range', 'sens', 'speed', 'countIn', 'guideMine', 'guideOthers', 'octave', 'partName', 'agc', 'names'];
   try {
     const saved = JSON.parse(localStorage.getItem('pitchtrace.settings') || '{}');
     for (const k of PERSIST) if (saved[k] != null) state[k] = saved[k];
@@ -29,6 +33,7 @@
   if (![6, 12, 24].includes(state.windowSec)) state.windowSec = 12;
   if (!(state.speed >= 0.25 && state.speed <= 1)) state.speed = 1;
   if (state.octave !== 'exact') state.octave = 'any';
+  if (state.names !== 'solfege') state.names = 'letters';
   if (state.range === 'score' || !(state.range === 'auto' || RANGES[state.range])) state.range = 'auto';
   function save() {
     try {
@@ -53,8 +58,9 @@
   const partField = $('partField'), partSel = $('part'), scoreRangeOpt = $('scoreRange');
   const octSel = $('octave'), countInCb = $('countIn'), mineCb = $('guideMine'), othersCb = $('guideOthers');
   const othersField = $('othersField'), pickupField = $('pickupField'), pickupIn = $('pickup'), removeBtn = $('removeSong');
-  const agcCb = $('agc'), calibBtn = $('calibrate'), calibNote = $('calibNote'), rangeInfo = $('rangeInfo');
+  const agcCb = $('agc'), calibBtn = $('calibrate'), calibNote = $('calibNote'), rangeInfo = $('rangeInfo'), namesSel = $('names');
   agcCb.checked = !!state.agc;
+  namesSel.value = state.names;
 
   rangeSel.value = state.range; winSel.value = String(state.windowSec); a4In.value = String(state.a4); sensIn.value = String(state.sens);
   speedSel.value = String(state.speed); if (speedSel.value !== String(state.speed)) { speedSel.value = '1'; state.speed = 1; }
@@ -79,7 +85,10 @@
   const qOf = (cents) => { const a = Math.abs(cents); return a <= GOOD ? 'good' : a <= CLOSE ? 'warn' : 'bad'; };
   const fold = (x) => x - 12 * Math.round(x / 12);
   let flats = false;
-  const noteName = (midi) => (flats ? FLAT : SHARP)[((midi % 12) + 12) % 12] + (Math.floor(midi / 12) - 1);
+  const noteName = (midi) => {
+    const table = state.names === 'solfege' ? (flats ? SOL_FLAT : SOL_SHARP) : (flats ? FLAT : SHARP);
+    return table[((midi % 12) + 12) % 12] + (Math.floor(midi / 12) - 1);
+  };
   const fmt = (sec) => { sec = Math.max(0, sec); return Math.floor(sec / 60) + ':' + String(Math.floor(sec % 60)).padStart(2, '0'); };
 
   function setStatus(kind, text) { statusEl.dataset.s = kind; statusText.textContent = text; }
@@ -223,6 +232,7 @@
       readoutEl.dataset.q = 'idle';
       pinEl.removeAttribute('data-q');
       pinEl.style.left = '50%';
+      noteEl.removeAttribute('data-long');
       noteEl.textContent = '—'; centsEl.innerHTML = '&nbsp;'; hzEl.innerHTML = '&nbsp;';
       verdictEl.textContent = idleVerdict();
       if (state.running) setStatus('listening', 'Listening');
@@ -234,7 +244,9 @@
     const a = Math.abs(cents);
     const q = qOf(cents);
     readoutEl.dataset.q = q;
-    noteEl.textContent = noteName(n);
+    const name = noteName(n);
+    noteEl.textContent = name;
+    noteEl.dataset.long = String(name.length >= 4); // longer names get a smaller type size
     centsEl.textContent = sign(cents) + a + ' ¢';
     verdictEl.textContent = a <= GOOD ? 'In tune' : hit && a >= 70 ? (cents > 0 ? 'Too high' : 'Too low') : cents > 0 ? 'Sharp' : 'Flat';
     hzEl.textContent = (hit ? 'Target ' + noteName(hit.tg) + ' · ' : '') + (state.a4 * Math.pow(2, (m - 69) / 12)).toFixed(1) + ' Hz';
@@ -397,7 +409,7 @@
     // Semitone grid and note labels.
     c.font = '11px ' + MONO;
     c.textAlign = 'right'; c.textBaseline = 'middle';
-    let lastLabelY = 1e9;
+    const labels = [];
     for (let m = Math.ceil(view.lo); m <= Math.floor(view.hi); m++) {
       const pc = ((m % 12) + 12) % 12;
       const y = yOf(m);
@@ -405,12 +417,12 @@
       c.strokeStyle = nat ? col.gridStrong : col.grid;
       c.lineWidth = pc === 0 ? 1.5 : 1;
       c.beginPath(); c.moveTo(L, y); c.lineTo(L + pw, y); c.stroke();
-      if (nat && lastLabelY - y >= 12) { // skip labels that would collide on a short plot
-        c.fillStyle = pc === 0 ? col.ink : col.muted;
-        c.fillText(NATURAL_LABEL[pc] + (Math.floor(m / 12) - 1), L - 8, y);
-        lastLabelY = y;
-      }
+      if (nat) labels.push({ y, pc, text: (state.names === 'solfege' ? SOL_NATURAL : NATURAL_LABEL)[pc] + (Math.floor(m / 12) - 1) });
     }
+    // On a short plot some labels would collide: the octave markers (C or Do) always stay, the rest fill the gaps.
+    const shown = labels.filter((l) => l.pc === 0);
+    for (const l of labels) if (l.pc !== 0 && shown.every((s) => Math.abs(s.y - l.y) >= 12)) shown.push(l);
+    for (const l of shown) { c.fillStyle = l.pc === 0 ? col.ink : col.muted; c.fillText(l.text, L - 8, l.y); }
 
     c.lineWidth = 1;
     if (score) {
@@ -471,7 +483,8 @@
         c.fillStyle = col.accent; c.fill();
         c.globalAlpha = a;
         c.strokeStyle = col.accent; c.lineWidth = active ? 2 : 1.25; c.stroke();
-        if (w > 30) { c.fillStyle = col.ink; c.fillText(noteName(n.midi), x1 + 5, y + 0.5); }
+        const label = noteName(n.midi);
+        if (w > label.length * 6.2 + 10) { c.fillStyle = col.ink; c.fillText(label, x1 + 5, y + 0.5); }
       }
       c.globalAlpha = 1;
     }
@@ -759,6 +772,13 @@
   mineCb.addEventListener('change', () => { state.guideMine = mineCb.checked; if (!state.guideMine) stopVoices((v) => v.mine); save(); });
   othersCb.addEventListener('change', () => { state.guideOthers = othersCb.checked; if (!state.guideOthers) stopVoices((v) => !v.mine); save(); });
   octSel.addEventListener('change', () => { state.octave = octSel.value; save(); });
+  namesSel.addEventListener('change', () => {
+    state.names = namesSel.value;
+    save();
+    if (score) updateRangeInfo();
+    if (lastVoiced) showNote(lastVoiced.m, null); // refresh the big readout straight away
+    draw();
+  });
   rangeSel.addEventListener('change', () => { state.range = rangeSel.value; save(); snapView(); draw(); });
   winSel.addEventListener('change', () => { state.windowSec = Number(winSel.value); save(); draw(); });
   a4In.addEventListener('change', () => { state.a4 = clamp(Number(a4In.value) || 440, 415, 466); a4In.value = String(state.a4); save(); });

@@ -25,6 +25,7 @@ Open the score in MuseScore and choose **File, Export, MIDI**. Each voice part b
 | Speed | 50% to 100%, for learning difficult passages. The guide tone keeps its pitch. |
 | Part | Which track is yours. The others can be heard as a backing, quieter. |
 | Count-in | One bar of clicks before playback starts. |
+| Note names | Letters (C D E) or fixed-do solfège (Do Re Mi), everywhere in the app. Do is always C, and octave numbers follow the usual scientific numbering, so middle C is Do4. |
 | Octave | "Any octave counts" accepts your note an octave above or below the target. "Exact octave" does not. |
 | Pickup beats | Sets bar 1 after a pickup measure, so bar numbers match your score. MIDI does not store pickups. |
 | Voice range | "Fit to score" frames your part. Other choices frame a voice range, and "Follow me" tracks your voice. |
