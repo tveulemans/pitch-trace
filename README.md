@@ -17,6 +17,10 @@ On a phone, use the browser menu and choose **Add to Home screen** or **Install 
 
 Open the score in MuseScore and choose **File, Export, MIDI**. Each voice part becomes its own track, named after the part, with repeats and tempo changes already played out. Songs you load are kept in the browser on that device (nothing is uploaded), so you load each file once per device.
 
+### Exercises
+
+Open **Exercises**, choose a warm-up and the lowest and highest note you want, then press **Start exercise**. Five are built in: long notes, a five-note scale, Do-Mi-Sol, leaps from Do, and a major scale. Each starts in the middle of your range, climbs in whole tones, descends, and returns, so every note stays within the limits you set. Loading a song sets the range to your part. The syllables (Do Re Mi) show under the grid, and the speed control slows an exercise down.
+
 ### Lyrics
 
 If the MIDI file contains lyric events, the words scroll under the grid with the notes. MuseScore 4 writes them when you export; older MuseScore versions do not. A file without lyrics simply shows none. If your part's track has no lyrics, the first track that has some is used.
@@ -66,7 +70,8 @@ then open `http://localhost:8000`.
 | `index.html` | Page structure |
 | `styles.css` | Styling, light and dark themes |
 | `pitch.js` | YIN pitch detection |
-| `midi.js` | MIDI file reader: parts, note times in seconds, bar grid |
+| `midi.js` | MIDI file reader: parts, note times in seconds, bar grid, lyrics |
+| `exercises.js` | Builds the training exercises as MIDI for your range |
 | `library.js` | Keeps loaded songs in the browser (IndexedDB) |
 | `app.js` | Microphone, playback, drawing, settings |
 | `manifest.webmanifest` | Makes the page installable |
@@ -74,7 +79,7 @@ then open `http://localhost:8000`.
 | `icons/` | App icons |
 | `tests/` | Checks for the detector and the MIDI reader |
 
-Run the tests with `node tests/pitch.test.js && node tests/midi.test.js`. Score files (`.mid`, `.mscz`) are listed in `.gitignore`, so they are not committed by accident; keep arrangements you do not own out of a public repository.
+Run the tests with `node tests/pitch.test.js && node tests/midi.test.js && node tests/exercises.test.js`. Score files (`.mid`, `.mscz`) are listed in `.gitignore`, so they are not committed by accident; keep arrangements you do not own out of a public repository.
 
 ## Updating
 

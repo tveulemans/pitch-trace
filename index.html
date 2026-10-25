@@ -89,6 +89,19 @@
       </select>
     </label>
     <span class="field">Input <span class="level" id="levelBox"><b id="levelBar"></b><u id="gateMark"></u></span></span>
+    <details class="settings" id="exPanel">
+      <summary>Exercises</summary>
+      <div class="grid">
+        <label class="field">Exercise <select id="exercise"></select></label>
+        <label class="field">Lowest note <select id="exLo"></select></label>
+        <label class="field">Highest note <select id="exHi"></select></label>
+        <div class="field" style="display:grid;gap:6px;justify-items:start">
+          <button class="btn primary" id="exGo" type="button">Start exercise</button>
+          <span id="exNote" aria-live="polite"></span>
+        </div>
+        <p class="help">Simple warm-ups made for your range: each one is repeated higher and lower, so the notes stay within the lowest and highest note you set. Loading a song sets the range to your part. Each exercise has the syllables under the grid.</p>
+      </div>
+    </details>
     <details class="settings">
       <summary>Settings</summary>
       <div class="grid">
@@ -154,6 +167,7 @@
 
 <script src="pitch.js"></script>
 <script src="midi.js"></script>
+<script src="exercises.js"></script>
 <script src="library.js"></script>
 <script src="app.js"></script>
 <script>

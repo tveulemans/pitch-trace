@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const { yin, median, FMIN, FMAX, loadMidi, library } = window.PitchTrace;
+  const { yin, median, FMIN, FMAX, loadMidi, library, exercises } = window.PitchTrace;
 
   const $ = (id) => document.getElementById(id);
   // Plain letters, because the flat and sharp symbols are missing from many monospace fonts.
@@ -23,9 +23,9 @@
 
   const state = {
     running: false, a4: 440, windowSec: 12, range: 'auto', sens: 50,
-    speed: 1, countIn: true, guideMine: true, guideOthers: true, octave: 'any', partName: '', agc: false, names: 'letters', staff: 'off', lyrics: true,
+    speed: 1, countIn: true, guideMine: true, guideOthers: true, octave: 'any', partName: '', agc: false, names: 'letters', staff: 'off', lyrics: true, exercise: 'five', exLo: 40, exHi: 62,
   };
-  const PERSIST = ['a4', 'windowSec', 'range', 'sens', 'speed', 'countIn', 'guideMine', 'guideOthers', 'octave', 'partName', 'agc', 'names', 'staff', 'lyrics'];
+  const PERSIST = ['a4', 'windowSec', 'range', 'sens', 'speed', 'countIn', 'guideMine', 'guideOthers', 'octave', 'partName', 'agc', 'names', 'staff', 'lyrics', 'exercise', 'exLo', 'exHi'];
   try {
     const saved = JSON.parse(localStorage.getItem('pitchtrace.settings') || '{}');
     for (const k of PERSIST) if (saved[k] != null) state[k] = saved[k];
@@ -36,6 +36,8 @@
   if (state.names !== 'solfege') state.names = 'letters';
   if (state.staff !== 'bass') state.staff = 'off';
   state.lyrics = state.lyrics !== false;
+  state.exLo = Math.min(84, Math.max(28, Math.round(Number(state.exLo)) || 40));
+  state.exHi = Math.min(84, Math.max(28, Math.round(Number(state.exHi)) || 62));
   if (state.range === 'score' || !(state.range === 'auto' || RANGES[state.range])) state.range = 'auto';
   function save() {
     try {
@@ -768,6 +770,7 @@
     songSel.innerHTML = '';
     songSel.add(new Option('Free tuner (no score)', ''));
     for (const s of songs) songSel.add(new Option(s.name.replace(/\.(mid|midi|kar)$/i, ''), s.id));
+    if (song && song.exercise) songSel.add(new Option('Exercise: ' + song.name, song.id));
     songSel.value = song ? song.id : '';
     songField.hidden = songs.length === 0;
   }
@@ -790,7 +793,9 @@
     rangeInfo.textContent = '';
     const b = (t) => { const e = document.createElement('b'); e.textContent = t; return e; };
     rangeInfo.append(p.name + ': lowest ', b(noteName(p.lo)), ', highest ', b(noteName(p.hi)), ' (' + size + ')');
-    if (lyricsOf().length) rangeInfo.append(' \u00b7 lyrics found');
+    if (song && song.exercise) rangeInfo.append(' \u00b7 ' + exercises.list.find((e) => e.name === song.name).help);
+    else if (lyricsOf().length) rangeInfo.append(' \u00b7 lyrics found');
+    if (song && !song.exercise) { state.exLo = clamp(p.lo, 28, 84); state.exHi = clamp(p.hi, 28, 84); save(); fillExRange(); }
   }
 
   function persistSong(rec) {
@@ -805,7 +810,7 @@
     try { sc = loadMidi(rec.bytes, rec.name); } catch (e) { showMsg((e && e.message) || 'That file could not be read.'); return false; }
     showMsg('');
     pause();
-    score = sc; song = rec; flats = sc.flats;
+    score = sc; song = rec; flats = rec.exercise ? true : sc.flats;
     let idx = rec.part != null && rec.part < sc.parts.length ? rec.part : -1;
     const want = (state.partName || '').toLowerCase();
     if (idx < 0 && want) idx = sc.parts.findIndex((p) => p.name.toLowerCase() === want);
@@ -816,11 +821,11 @@
     pts.length = 0; med.length = 0; lastVoiced = null; breakPushed = true;
     seekEl.max = String(sc.durationSec);
     pickupIn.value = String(rec.pickup || 0);
-    transportEl.hidden = false; pickupField.hidden = false; removeBtn.hidden = false;
+    transportEl.hidden = false; pickupField.hidden = !!rec.exercise; removeBtn.hidden = !!rec.exercise;
     scoreRangeOpt.disabled = false; scoreRangeOpt.hidden = false;
     state.range = 'score'; rangeSel.value = 'score';
     lastPosText = ''; lastSeekInput = 0;
-    lsSet('pitchtrace.last', rec.id);
+    if (!rec.exercise) lsSet('pitchtrace.last', rec.id);
     fillSongs(); updateEmpty(); showNote(null); updateTransportUI(); snapView(); draw();
     return true;
   }
@@ -835,6 +840,38 @@
     lsSet('pitchtrace.last', null);
     fillSongs(); updateEmpty(); showNote(null); snapView(); draw();
   }
+
+
+  /* ---------- exercises ---------- */
+
+  const exSel = $('exercise'), exLo = $('exLo'), exHi = $('exHi'), exGo = $('exGo'), exNote = $('exNote');
+  exercises.list.forEach((e) => exSel.add(new Option(e.name, e.id)));
+  if (!exercises.list.some((e) => e.id === state.exercise)) state.exercise = exercises.list[0].id;
+  exSel.value = state.exercise;
+
+  function fillExRange() {
+    for (const [sel, val] of [[exLo, state.exLo], [exHi, state.exHi]]) {
+      sel.innerHTML = '';
+      for (let m = 28; m <= 84; m++) sel.add(new Option(noteName(m), String(m)));
+      sel.value = String(val);
+    }
+    exNote.textContent = '';
+  }
+
+  fillExRange();
+  exSel.addEventListener('change', () => { state.exercise = exSel.value; save(); });
+  exLo.addEventListener('change', () => { state.exLo = Number(exLo.value); if (state.exHi < state.exLo) { state.exHi = state.exLo; exHi.value = String(state.exHi); } save(); });
+  exHi.addEventListener('change', () => { state.exHi = Number(exHi.value); if (state.exLo > state.exHi) { state.exLo = state.exHi; exLo.value = String(state.exLo); } save(); });
+  exGo.addEventListener('click', () => {
+    let ex;
+    try { ex = exercises.build(state.exercise, state.exLo, state.exHi); } catch (e) { showMsg('That exercise could not be built.'); return; }
+    const rec = { id: 'exercise', name: ex.name, bytes: ex.bytes.buffer, added: Date.now(), pickup: 0, part: 0, exercise: true };
+    if (!openSong(rec)) return;
+    exNote.textContent = ex.widened
+      ? 'Your range is narrower than this exercise, so it goes up to ' + noteName(ex.hi) + '.'
+      : 'Starts in the middle of your range, climbs, descends, and comes back. Press Play.';
+    play();
+  });
 
   /* ---------- controls ---------- */
 
@@ -858,6 +895,7 @@
   namesSel.addEventListener('change', () => {
     state.names = namesSel.value;
     save();
+    fillExRange();
     if (score) updateRangeInfo();
     if (lastVoiced) showNote(lastVoiced.m, null); // refresh the big readout straight away
     draw();
