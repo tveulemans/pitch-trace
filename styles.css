@@ -57,6 +57,8 @@
     padding-block: 12px;
   }
 
+  .app > * { flex: none; }          /* on a short screen only the plot gives way, and the page scrolls */
+  .app > .plot { flex: 1 1 auto; }
   .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
   h1 { margin: 0; font-size: 13px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
   .status { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }

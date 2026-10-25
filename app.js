@@ -23,9 +23,9 @@
 
   const state = {
     running: false, a4: 440, windowSec: 12, range: 'auto', sens: 50,
-    speed: 1, countIn: true, guideMine: true, guideOthers: true, octave: 'any', partName: '', agc: false, names: 'letters',
+    speed: 1, countIn: true, guideMine: true, guideOthers: true, octave: 'any', partName: '', agc: false, names: 'letters', staff: 'off',
   };
-  const PERSIST = ['a4', 'windowSec', 'range', 'sens', 'speed', 'countIn', 'guideMine', 'guideOthers', 'octave', 'partName', 'agc', 'names'];
+  const PERSIST = ['a4', 'windowSec', 'range', 'sens', 'speed', 'countIn', 'guideMine', 'guideOthers', 'octave', 'partName', 'agc', 'names', 'staff'];
   try {
     const saved = JSON.parse(localStorage.getItem('pitchtrace.settings') || '{}');
     for (const k of PERSIST) if (saved[k] != null) state[k] = saved[k];
@@ -34,6 +34,7 @@
   if (!(state.speed >= 0.25 && state.speed <= 1)) state.speed = 1;
   if (state.octave !== 'exact') state.octave = 'any';
   if (state.names !== 'solfege') state.names = 'letters';
+  if (state.staff !== 'bass') state.staff = 'off';
   if (state.range === 'score' || !(state.range === 'auto' || RANGES[state.range])) state.range = 'auto';
   function save() {
     try {
@@ -58,9 +59,10 @@
   const partField = $('partField'), partSel = $('part'), scoreRangeOpt = $('scoreRange');
   const octSel = $('octave'), countInCb = $('countIn'), mineCb = $('guideMine'), othersCb = $('guideOthers');
   const othersField = $('othersField'), pickupField = $('pickupField'), pickupIn = $('pickup'), removeBtn = $('removeSong');
-  const agcCb = $('agc'), calibBtn = $('calibrate'), calibNote = $('calibNote'), rangeInfo = $('rangeInfo'), namesSel = $('names');
+  const agcCb = $('agc'), calibBtn = $('calibrate'), calibNote = $('calibNote'), rangeInfo = $('rangeInfo'), namesSel = $('names'), staffSel = $('staff');
   agcCb.checked = !!state.agc;
   namesSel.value = state.names;
+  staffSel.value = state.staff;
 
   rangeSel.value = state.range; winSel.value = String(state.windowSec); a4In.value = String(state.a4); sensIn.value = String(state.sens);
   speedSel.value = String(state.speed); if (speedSel.value !== String(state.speed)) { speedSel.value = '1'; state.speed = 1; }
@@ -89,6 +91,12 @@
     const table = state.names === 'solfege' ? (flats ? SOL_FLAT : SOL_SHARP) : (flats ? FLAT : SHARP);
     return table[((midi % 12) + 12) % 12] + (Math.floor(midi / 12) - 1);
   };
+  // Position of a note on the staff, counted in letter steps (C4 = 28, so each step is a line or a space).
+  const LETTER = { C: 0, D: 1, E: 2, F: 3, G: 4, A: 5, B: 6 };
+  const NATURAL_SEMI = [0, 2, 4, 5, 7, 9, 11];
+  const stepOf = (midi) => LETTER[(flats ? FLAT : SHARP)[((midi % 12) + 12) % 12][0]] + 7 * (Math.floor(midi / 12) - 1);
+  const naturalMidi = (step) => NATURAL_SEMI[step % 7] + 12 * (Math.floor(step / 7) + 1);
+  const BASS_LINES = [43, 47, 50, 53, 57]; // G2 B2 D3 F3 A3
   const fmt = (sec) => { sec = Math.max(0, sec); return Math.floor(sec / 60) + ':' + String(Math.floor(sec % 60)).padStart(2, '0'); };
 
   function setStatus(kind, text) { statusEl.dataset.s = kind; statusText.textContent = text; }
@@ -376,6 +384,27 @@
 
   const MONO = 'ui-monospace, Menlo, Consolas, monospace';
 
+  // The five lines of the bass clef (clé de fa) at their true pitch, with the clef on the left.
+  function drawBassStaff(c, L, pw, T, ph, yOf, clefW) {
+    c.save();
+    c.beginPath(); c.rect(L, T, pw, ph); c.clip();
+    c.strokeStyle = col.ink; c.fillStyle = col.ink; c.globalAlpha = 0.5; c.lineWidth = 1.5;
+    for (const m of BASS_LINES) { const y = yOf(m); c.beginPath(); c.moveTo(L, y); c.lineTo(L + pw, y); c.stroke(); }
+    const u = Math.min((yOf(43) - yOf(57)) / 4, clefW / 3);
+    if (u >= 5) {
+      const x0 = L + 8, yF = yOf(53); // the clef curls around the F line
+      c.globalAlpha = 0.8; c.lineCap = 'round'; c.lineWidth = Math.max(1.5, u * 0.3);
+      c.beginPath();
+      c.moveTo(x0 + 0.35 * u, yF);
+      c.bezierCurveTo(x0 + 0.35 * u, yF - 1.5 * u, x0 + 2.0 * u, yF - 1.3 * u, x0 + 1.9 * u, yF + 0.3 * u);
+      c.bezierCurveTo(x0 + 1.8 * u, yF + 1.6 * u, x0 + 1.0 * u, yF + 2.4 * u, x0 + 0.2 * u, yF + 3.0 * u);
+      c.stroke();
+      c.beginPath(); c.arc(x0 + 0.35 * u, yF, 0.36 * u, 0, Math.PI * 2); c.fill();
+      for (const m of [55, 51.5]) { c.beginPath(); c.arc(x0 + 2.7 * u, yOf(m), 0.15 * u + 0.5, 0, Math.PI * 2); c.fill(); }
+    }
+    c.restore();
+  }
+
   function draw() {
     if (!cssW) return;
     const now = viewTime();
@@ -459,6 +488,8 @@
       }
     }
 
+    if (state.staff === 'bass') drawBassStaff(c, L, pw, T, ph, yOf, Math.min(phx - L - 14, pw * 0.22));
+
     // Playhead (the right edge in the free tuner).
     c.strokeStyle = col.muted; c.lineWidth = score ? 1.5 : 1;
     c.beginPath(); c.moveTo(phx, score ? T - 5 : T); c.lineTo(phx, T + ph); c.stroke();
@@ -478,6 +509,16 @@
         const w = Math.max(2, x2 - x1 - 1);
         const active = n.start <= now && now < n.end;
         const a = active ? 1 : n.end <= now ? 0.35 : 0.75;
+        if (state.staff === 'bass') {
+          // Ledger lines for notes above or below the staff.
+          const s = stepOf(n.midi);
+          c.save();
+          c.strokeStyle = col.ink; c.globalAlpha = 0.5 * a; c.lineWidth = 1.5;
+          const ledger = (k) => { const ly = yOf(naturalMidi(k)); c.beginPath(); c.moveTo(x1 - 5, ly); c.lineTo(x1 + w + 5, ly); c.stroke(); };
+          if (s >= 28) for (let k = 28; k <= s; k += 2) ledger(k);
+          else if (s <= 16) for (let k = 16; k >= s; k -= 2) ledger(k);
+          c.restore();
+        }
         roundRect(c, x1, y - h / 2, w, h, 4);
         c.globalAlpha = active ? 0.5 : 0.22 * a;
         c.fillStyle = col.accent; c.fill();
@@ -772,6 +813,7 @@
   mineCb.addEventListener('change', () => { state.guideMine = mineCb.checked; if (!state.guideMine) stopVoices((v) => v.mine); save(); });
   othersCb.addEventListener('change', () => { state.guideOthers = othersCb.checked; if (!state.guideOthers) stopVoices((v) => !v.mine); save(); });
   octSel.addEventListener('change', () => { state.octave = octSel.value; save(); });
+  staffSel.addEventListener('change', () => { state.staff = staffSel.value; save(); draw(); });
   namesSel.addEventListener('change', () => {
     state.names = namesSel.value;
     save();

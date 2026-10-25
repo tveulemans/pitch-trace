@@ -26,6 +26,7 @@ Open the score in MuseScore and choose **File, Export, MIDI**. Each voice part b
 | Part | Which track is yours. The others can be heard as a backing, quieter. |
 | Count-in | One bar of clicks before playback starts. |
 | Note names | Letters (C D E) or fixed-do solfège (Do Re Mi), everywhere in the app. Do is always C, and octave numbers follow the usual scientific numbering, so middle C is Do4. |
+| Staff overlay | Draws the five bass-clef lines (G2 B2 D3 F3 A3) over the grid, with the clé de fa and ledger lines for notes above or below the staff. The lines sit at their true pitch, so notes with a flat or sharp sit just off their line. |
 | Octave | "Any octave counts" accepts your note an octave above or below the target. "Exact octave" does not. |
 | Pickup beats | Sets bar 1 after a pickup measure, so bar numbers match your score. MIDI does not store pickups. |
 | Voice range | "Fit to score" frames your part. Other choices frame a voice range, and "Follow me" tracks your voice. |
