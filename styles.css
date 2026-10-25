@@ -104,6 +104,8 @@
   .transport .row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
   .pos { margin-left: auto; font-family: var(--mono); font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
   #seek { width: 100%; margin: 0; accent-color: var(--accent); }
+  .range-info { margin: 0; font-size: 13px; color: var(--muted); }
+  .range-info b { color: var(--ink); font-family: var(--mono); font-weight: 600; }
   input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent); margin: 0; }
   .field { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
   select, input[type="number"] { background: var(--panel); border: 1px solid var(--grid-strong); border-radius: 8px; padding: 9px 10px; color: var(--ink); }

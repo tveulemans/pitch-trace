@@ -53,7 +53,7 @@
   const partField = $('partField'), partSel = $('part'), scoreRangeOpt = $('scoreRange');
   const octSel = $('octave'), countInCb = $('countIn'), mineCb = $('guideMine'), othersCb = $('guideOthers');
   const othersField = $('othersField'), pickupField = $('pickupField'), pickupIn = $('pickup'), removeBtn = $('removeSong');
-  const agcCb = $('agc'), calibBtn = $('calibrate'), calibNote = $('calibNote');
+  const agcCb = $('agc'), calibBtn = $('calibrate'), calibNote = $('calibNote'), rangeInfo = $('rangeInfo');
   agcCb.checked = !!state.agc;
 
   rangeSel.value = state.range; winSel.value = String(state.windowSec); a4In.value = String(state.a4); sensIn.value = String(state.sens);
@@ -687,6 +687,18 @@
     othersField.hidden = score.parts.length < 2;
   }
 
+  // "Bass: lowest Ab2, highest C4 (1 octave and 4 semitones)"
+  function updateRangeInfo() {
+    const p = score.parts[partIdx];
+    const span = p.hi - p.lo;
+    const oct = Math.floor(span / 12), rem = span % 12;
+    const plural = (n, w) => n + ' ' + w + (n === 1 ? '' : 's');
+    const size = !span ? 'a single note' : [oct ? plural(oct, 'octave') : '', rem ? plural(rem, 'semitone') : ''].filter(Boolean).join(' and ');
+    rangeInfo.textContent = '';
+    const b = (t) => { const e = document.createElement('b'); e.textContent = t; return e; };
+    rangeInfo.append(p.name + ': lowest ', b(noteName(p.lo)), ', highest ', b(noteName(p.hi)), ' (' + size + ')');
+  }
+
   function persistSong(rec) {
     if (!library) return;
     library.put(rec).catch(() => showMsg('This device cannot keep songs between visits. The song stays available until you close the app.'));
@@ -705,7 +717,7 @@
     if (idx < 0 && want) idx = sc.parts.findIndex((p) => p.name.toLowerCase() === want);
     if (idx < 0 && want) idx = sc.parts.findIndex((p) => p.name.toLowerCase().includes(want));
     partIdx = idx < 0 ? 0 : idx;
-    buildQueue(); rebuildBars(); fillParts();
+    buildQueue(); rebuildBars(); fillParts(); updateRangeInfo();
     tp.pos = tp.startPos;
     pts.length = 0; med.length = 0; lastVoiced = null; breakPushed = true;
     seekEl.max = String(sc.durationSec);
@@ -782,7 +794,7 @@
     partIdx = Number(partSel.value);
     song.part = partIdx;
     state.partName = score.parts[partIdx].name.toLowerCase();
-    buildQueue(); rebuildBars();
+    buildQueue(); rebuildBars(); updateRangeInfo();
     if (tp.playing) rebase(tlNow());
     pts.length = 0; breakPushed = true;
     persistSong(song); save(); snapView(); draw();
