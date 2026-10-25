@@ -116,4 +116,22 @@ assert.throws(() => loadMidi(smf(2, 480, [track([])]), 'x'), /format 2/);
   assert.ok(sc.parts[0].notes.length >= 1);
 }
 
+/* Lyric events: syllables, hyphen joins, placeholders, extra verses at the same tick, UTF-8 text. */
+{
+  const ly = (s) => meta(0x05, Array.from(Buffer.from(s, 'utf8')));
+  const t = track([
+    [0, tempo(120)],
+    [0, ly('Hel-')], [0, [0x90, 60, 80]], [480, [0x80, 60, 0]],
+    [0, ly('lo')], [0, ly('verse2')], [0, [0x90, 62, 80]], [480, [0x80, 62, 0]],
+    [0, ly('-')], [0, ly('caf\u00e9')], [0, [0x90, 64, 80]], [480, [0x80, 64, 0]],
+  ]);
+  const sc = loadMidi(smf(1, 480, [t]), 'ly.mid');
+  const L = sc.parts[0].lyrics;
+  assert.deepEqual(L.map((e) => e.text), ['Hel', 'lo', 'caf\u00e9']);
+  assert.deepEqual(L.map((e) => e.join), [true, false, false]);
+  assert.ok(Math.abs(L[1].start - 0.5) < 1e-6);
+  const none = loadMidi(smf(1, 480, [track([[0, [0x90, 60, 80]], [480, [0x80, 60, 0]]])]), 'n.mid');
+  assert.equal(none.parts[0].lyrics.length, 0);
+}
+
 console.log('midi tests passed');

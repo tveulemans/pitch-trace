@@ -23,9 +23,9 @@
 
   const state = {
     running: false, a4: 440, windowSec: 12, range: 'auto', sens: 50,
-    speed: 1, countIn: true, guideMine: true, guideOthers: true, octave: 'any', partName: '', agc: false, names: 'letters', staff: 'off',
+    speed: 1, countIn: true, guideMine: true, guideOthers: true, octave: 'any', partName: '', agc: false, names: 'letters', staff: 'off', lyrics: true,
   };
-  const PERSIST = ['a4', 'windowSec', 'range', 'sens', 'speed', 'countIn', 'guideMine', 'guideOthers', 'octave', 'partName', 'agc', 'names', 'staff'];
+  const PERSIST = ['a4', 'windowSec', 'range', 'sens', 'speed', 'countIn', 'guideMine', 'guideOthers', 'octave', 'partName', 'agc', 'names', 'staff', 'lyrics'];
   try {
     const saved = JSON.parse(localStorage.getItem('pitchtrace.settings') || '{}');
     for (const k of PERSIST) if (saved[k] != null) state[k] = saved[k];
@@ -35,6 +35,7 @@
   if (state.octave !== 'exact') state.octave = 'any';
   if (state.names !== 'solfege') state.names = 'letters';
   if (state.staff !== 'bass') state.staff = 'off';
+  state.lyrics = state.lyrics !== false;
   if (state.range === 'score' || !(state.range === 'auto' || RANGES[state.range])) state.range = 'auto';
   function save() {
     try {
@@ -59,10 +60,11 @@
   const partField = $('partField'), partSel = $('part'), scoreRangeOpt = $('scoreRange');
   const octSel = $('octave'), countInCb = $('countIn'), mineCb = $('guideMine'), othersCb = $('guideOthers');
   const othersField = $('othersField'), pickupField = $('pickupField'), pickupIn = $('pickup'), removeBtn = $('removeSong');
-  const agcCb = $('agc'), calibBtn = $('calibrate'), calibNote = $('calibNote'), rangeInfo = $('rangeInfo'), namesSel = $('names'), staffSel = $('staff');
+  const agcCb = $('agc'), calibBtn = $('calibrate'), calibNote = $('calibNote'), rangeInfo = $('rangeInfo'), namesSel = $('names'), staffSel = $('staff'), lyricsCb = $('lyrics');
   agcCb.checked = !!state.agc;
   namesSel.value = state.names;
   staffSel.value = state.staff;
+  lyricsCb.checked = state.lyrics;
 
   rangeSel.value = state.range; winSel.value = String(state.windowSec); a4In.value = String(state.a4); sensIn.value = String(state.sens);
   speedSel.value = String(state.speed); if (speedSel.value !== String(state.speed)) { speedSel.value = '1'; state.speed = 1; }
@@ -383,6 +385,7 @@
   }
 
   const MONO = 'ui-monospace, Menlo, Consolas, monospace';
+  const SANS = '"Avenir Next", "Segoe UI", Roboto, system-ui, sans-serif';
 
   // The five lines of the bass clef (clé de fa) at their true pitch, with the clef on the left.
   function drawBassStaff(c, L, pw, T, ph, yOf, clefW) {
@@ -405,6 +408,39 @@
     c.restore();
   }
 
+  // Lyrics of the chosen part; if that track has none, use the first track that does (they are timed by their own events).
+  function lyricsOf() {
+    if (!score) return [];
+    const mine = score.parts[partIdx].lyrics;
+    if (mine && mine.length) return mine;
+    for (const p of score.parts) if (p.lyrics && p.lyrics.length) return p.lyrics;
+    return [];
+  }
+
+  function drawLyrics(c, L, pw, T, ph, now, xOf, tL, tR, laneH) {
+    const ly = lyricsOf();
+    if (!ly.length) return;
+    const y0 = T + ph + 4, mid = y0 + laneH / 2;
+    c.save();
+    c.beginPath(); c.rect(L, y0, pw, laneH); c.clip();
+    c.font = '600 14px ' + SANS; c.textBaseline = 'middle'; c.textAlign = 'left';
+    for (let i = 0; i < ly.length; i++) {
+      const e = ly[i], nx = i + 1 < ly.length ? ly[i + 1].start : e.start + 2;
+      if (nx < tL) continue;
+      if (e.start > tR) break;
+      const x = xOf(e.start), room = xOf(nx) - x - 3;
+      const active = e.start <= now && now < nx;
+      c.save();
+      c.beginPath(); c.rect(x, y0, Math.max(4, room), laneH); c.clip();
+      c.fillStyle = active ? col.accent : nx <= now ? col.muted : col.ink;
+      c.globalAlpha = nx <= now ? 0.6 : 1;
+      c.fillText(e.text + (e.join ? '-' : ''), x + 1, mid);
+      c.restore();
+      c.strokeStyle = col.gridStrong; c.beginPath(); c.moveTo(x, y0); c.lineTo(x, y0 + 4); c.stroke();
+    }
+    c.restore();
+  }
+
   function draw() {
     if (!cssW) return;
     const now = viewTime();
@@ -413,7 +449,9 @@
     c.clearRect(0, 0, cssW, cssH);
     updateView(now, !(state.running || tp.playing));
 
-    const L = 44, R = 12, T = score ? 20 : 8, B = 18;
+    const hasLyrics = !!(score && state.lyrics && lyricsOf().length);
+    const laneH = hasLyrics ? 26 : 0;
+    const L = 44, R = 12, T = score ? 20 : 8, B = 18 + laneH;
     const pw = cssW - L - R, ph = cssH - T - B;
     if (pw < 40 || ph < 40) return;
     const phx = score ? L + pw * PLAYHEAD : L + pw;
@@ -454,6 +492,7 @@
     for (const l of shown) { c.fillStyle = l.pc === 0 ? col.ink : col.muted; c.fillText(l.text, L - 8, l.y); }
 
     c.lineWidth = 1;
+    if (hasLyrics) drawLyrics(c, L, pw, T, ph, now, xOf, tL, tR, laneH - 4);
     if (score) {
       // Bar lines with bar numbers, and beat lines when there is room.
       c.font = '10px ' + MONO; c.textAlign = 'left'; c.textBaseline = 'alphabetic';
@@ -751,6 +790,7 @@
     rangeInfo.textContent = '';
     const b = (t) => { const e = document.createElement('b'); e.textContent = t; return e; };
     rangeInfo.append(p.name + ': lowest ', b(noteName(p.lo)), ', highest ', b(noteName(p.hi)), ' (' + size + ')');
+    if (lyricsOf().length) rangeInfo.append(' \u00b7 lyrics found');
   }
 
   function persistSong(rec) {
@@ -813,6 +853,7 @@
   mineCb.addEventListener('change', () => { state.guideMine = mineCb.checked; if (!state.guideMine) stopVoices((v) => v.mine); save(); });
   othersCb.addEventListener('change', () => { state.guideOthers = othersCb.checked; if (!state.guideOthers) stopVoices((v) => !v.mine); save(); });
   octSel.addEventListener('change', () => { state.octave = octSel.value; save(); });
+  lyricsCb.addEventListener('change', () => { state.lyrics = lyricsCb.checked; save(); draw(); });
   staffSel.addEventListener('change', () => { state.staff = staffSel.value; save(); draw(); });
   namesSel.addEventListener('change', () => {
     state.names = namesSel.value;

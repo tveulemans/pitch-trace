@@ -8,6 +8,14 @@
   const MAX_SECONDS = 2 * 60 * 60;
   const MAX_BARS = 20000;
 
+  const utf8 = typeof TextDecoder !== 'undefined' ? new TextDecoder('utf-8', { fatal: true }) : null;
+  function decode(bytes) {
+    try { if (utf8) return utf8.decode(bytes); } catch (e) { /* not UTF-8, fall through */ }
+    let s = '';
+    for (let k = 0; k < bytes.length; k++) s += String.fromCharCode(bytes[k]); // Latin-1 for older files
+    return s;
+  }
+
   /* ---------- binary parsing ---------- */
 
   function parseSmf(input) {
@@ -32,7 +40,7 @@
     let endTick = 0;
 
     function parseTrack(start, end) {
-      const tr = { name: '', notes: [] };
+      const tr = { name: '', notes: [], lyrics: [] };
       const open = new Map(); // channel*128+pitch -> [{tick, vel}]
       let i = start, tick = 0, rs = 0;
       const vlq = () => {
@@ -44,11 +52,7 @@
         }
         return v;
       };
-      const text = (a, b) => {
-        let s = '';
-        for (let k = a; k < b; k++) s += String.fromCharCode(u8[k]);
-        try { return decodeURIComponent(escape(s)).trim(); } catch (e) { return s.trim(); }
-      };
+      const text = (a, b) => decode(u8.subarray(a, b)).trim();
       const close = (key, at) => {
         const q = open.get(key);
         if (!q || !q.length) return;
@@ -71,6 +75,7 @@
           else if (type === 0x58 && len >= 2) meters.push({ tick, num: u8[d], den: 1 << u8[d + 1] });
           else if (type === 0x59 && len >= 2) keys.push({ tick, sf: (u8[d] << 24) >> 24 });
           else if (type === 0x03 && !tr.name) tr.name = text(d, i);
+          else if (type === 0x05) tr.lyrics.push({ tick, text: decode(u8.subarray(d, i)) });
           continue;
         }
         if (st === 0xf0 || st === 0xf7) {
@@ -145,6 +150,28 @@
     return { beats, beatTicks, barTicks };
   }
 
+  /* ---------- lyrics ---------- */
+
+  /* Lyric events carry one syllable each. Writers differ in how they mark word breaks, so accept the usual
+     conventions: a trailing hyphen means the word continues, "/" or "\" starts a new line (karaoke files),
+     lone "-" or "_" placeholders are skipped. Extra verses stored at the same tick are ignored. */
+  function buildLyrics(events, tm) {
+    const out = [];
+    let lastTick = -1, newline = false;
+    for (const ev of events) {
+      let t = ev.text.replace(/\0/g, '');
+      if (t[0] === '/' || t[0] === '\\') { newline = true; t = t.slice(1); }
+      const core = t.trim();
+      if (!core || core === '-' || core === '_') continue;
+      if (ev.tick === lastTick) continue;
+      const join = core.endsWith('-');
+      out.push({ start: tm.tickToSec(ev.tick), text: join ? core.slice(0, -1) : core, join, newline });
+      newline = false;
+      lastTick = ev.tick;
+    }
+    return out;
+  }
+
   /* ---------- score ---------- */
 
   function loadMidi(input, fileName) {
@@ -170,13 +197,18 @@
       }
       const many = byCh.size > 1;
       const base = tr.name || 'Part ' + (new Set(parts.map((p) => p.track)).size + 1);
+      let first = true;
       for (const [ch, list] of byCh) {
         const notes = list.map((n) => ({
           start: tm.tickToSec(n.tick), end: tm.tickToSec(n.tick + n.dur), midi: n.midi, vel: n.vel,
         }));
         let lo = 127, hi = 0;
         for (const n of notes) { if (n.midi < lo) lo = n.midi; if (n.midi > hi) hi = n.midi; }
-        parts.push({ name: many ? base + ' (ch ' + (ch + 1) + ')' : base, notes, lo, hi, track: ti, channel: ch });
+        parts.push({
+          name: many ? base + ' (ch ' + (ch + 1) + ')' : base, notes, lo, hi, track: ti, channel: ch,
+          lyrics: first ? buildLyrics(tr.lyrics, tm) : [],
+        });
+        first = false;
       }
     });
     if (!parts.length) throw new Error('No notes were found in this MIDI file.');

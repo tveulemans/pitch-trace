@@ -17,6 +17,10 @@ On a phone, use the browser menu and choose **Add to Home screen** or **Install 
 
 Open the score in MuseScore and choose **File, Export, MIDI**. Each voice part becomes its own track, named after the part, with repeats and tempo changes already played out. Songs you load are kept in the browser on that device (nothing is uploaded), so you load each file once per device.
 
+### Lyrics
+
+If the MIDI file contains lyric events, the words scroll under the grid with the notes. MuseScore 4 writes them when you export; older MuseScore versions do not. A file without lyrics simply shows none. If your part's track has no lyrics, the first track that has some is used.
+
 ### Controls
 
 | Control | What it does |
@@ -27,6 +31,7 @@ Open the score in MuseScore and choose **File, Export, MIDI**. Each voice part b
 | Count-in | One bar of clicks before playback starts. |
 | Note names | Letters (C D E) or fixed-do solfège (Do Re Mi), everywhere in the app. Do is always C, and octave numbers follow the usual scientific numbering, so middle C is Do4. |
 | Staff overlay | Draws the five bass-clef lines (G2 B2 D3 F3 A3) over the grid, with the clé de fa and ledger lines for notes above or below the staff. The lines sit at their true pitch, so notes with a flat or sharp sit just off their line. |
+| Show lyrics | Draws the words under the grid, scrolling with the notes; the syllable being sung is highlighted. Needs lyrics inside the MIDI file (see below). |
 | Octave | "Any octave counts" accepts your note an octave above or below the target. "Exact octave" does not. |
 | Pickup beats | Sets bar 1 after a pickup measure, so bar numbers match your score. MIDI does not store pickups. |
 | Voice range | "Fit to score" frames your part. Other choices frame a voice range, and "Follow me" tracks your voice. |
