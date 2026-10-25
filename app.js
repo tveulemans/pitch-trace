@@ -19,9 +19,9 @@
 
   const state = {
     running: false, a4: 440, windowSec: 12, range: 'auto', sens: 50,
-    speed: 1, countIn: true, guideMine: true, guideOthers: true, octave: 'any', partName: '',
+    speed: 1, countIn: true, guideMine: true, guideOthers: true, octave: 'any', partName: '', agc: false,
   };
-  const PERSIST = ['a4', 'windowSec', 'range', 'sens', 'speed', 'countIn', 'guideMine', 'guideOthers', 'octave', 'partName'];
+  const PERSIST = ['a4', 'windowSec', 'range', 'sens', 'speed', 'countIn', 'guideMine', 'guideOthers', 'octave', 'partName', 'agc'];
   try {
     const saved = JSON.parse(localStorage.getItem('pitchtrace.settings') || '{}');
     for (const k of PERSIST) if (saved[k] != null) state[k] = saved[k];
@@ -53,6 +53,8 @@
   const partField = $('partField'), partSel = $('part'), scoreRangeOpt = $('scoreRange');
   const octSel = $('octave'), countInCb = $('countIn'), mineCb = $('guideMine'), othersCb = $('guideOthers');
   const othersField = $('othersField'), pickupField = $('pickupField'), pickupIn = $('pickup'), removeBtn = $('removeSong');
+  const agcCb = $('agc'), calibBtn = $('calibrate'), calibNote = $('calibNote');
+  agcCb.checked = !!state.agc;
 
   rangeSel.value = state.range; winSel.value = String(state.windowSec); a4In.value = String(state.a4); sensIn.value = String(state.sens);
   speedSel.value = String(state.speed); if (speedSel.value !== String(state.speed)) { speedSel.value = '1'; state.speed = 1; }
@@ -199,8 +201,17 @@
   const view = { lo: 48, hi: 66 };
   let autoCenter = 57;
 
-  function setGate() { gateDb = -30 - state.sens * 0.3; gateMark.style.left = ((gateDb + 70) / 70) * 100 + '%'; }
+  // The sensitivity slider sets the level (in dB) below which the microphone is ignored.
+  // 0 to 50 covers -30 to -45 dB; 50 to 100 reaches down to -75 dB for quiet singing and quiet phones.
+  const METER_MIN = -80;
+  const gateFromSens = (s) => (s <= 50 ? -30 - s * 0.3 : -45 - (s - 50) * 0.6);
+  const sensFromGate = (g) => clamp(g >= -45 ? (-30 - g) / 0.3 : 50 + (-45 - g) / 0.6, 0, 100);
+  function setGate() {
+    gateDb = gateFromSens(state.sens);
+    gateMark.style.left = clamp(((gateDb - METER_MIN) / -METER_MIN) * 100, 0, 100) + '%';
+  }
   setGate();
+  let calib = null; // while measuring room noise: { max, n }
 
   function idleVerdict() {
     if (!state.running) return score && !tp.playing ? 'Press Play' : 'Microphone off';
@@ -232,7 +243,7 @@
     setStatus('hearing', 'Hearing you');
   }
 
-  function setLevel(db) { levelBar.style.width = clamp(((db + 70) / 70) * 100, 0, 100) + '%'; }
+  function setLevel(db) { levelBar.style.width = clamp(((db - METER_MIN) / -METER_MIN) * 100, 0, 100) + '%'; }
 
   function pushBreak(t) { if (!breakPushed) { pts.push({ t, m: null }); breakPushed = true; } }
   function unvoiced(rec, t) {
@@ -264,9 +275,12 @@
     for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
     const db = 20 * Math.log10(Math.sqrt(sum / buf.length) + 1e-9);
     setLevel(db);
+    if (calib) { calib.max = Math.max(calib.max, db); calib.n++; }
     const t = tlNow();
     const rec = !score || (tp.playing && t >= tp.pos0); // not recorded while paused or during the count-in
-    if (db < gateDb) return unvoiced(rec, t);
+    // Once a note is sounding, keep listening a little below the threshold so quiet note endings are not cut off.
+    const singing = lastVoiced && wall() - lastVoiced.w < 0.3;
+    if (db < (singing ? gateDb - 6 : gateDb)) return unvoiced(rec, t);
     const r = yin(buf, audioCtx.sampleRate, FMIN, FMAX);
     if (!r || r.clarity < 0.8) return unvoiced(rec, t);
     const raw = 69 + 12 * Math.log2(r.freq / state.a4);
@@ -383,6 +397,7 @@
     // Semitone grid and note labels.
     c.font = '11px ' + MONO;
     c.textAlign = 'right'; c.textBaseline = 'middle';
+    let lastLabelY = 1e9;
     for (let m = Math.ceil(view.lo); m <= Math.floor(view.hi); m++) {
       const pc = ((m % 12) + 12) % 12;
       const y = yOf(m);
@@ -390,9 +405,10 @@
       c.strokeStyle = nat ? col.gridStrong : col.grid;
       c.lineWidth = pc === 0 ? 1.5 : 1;
       c.beginPath(); c.moveTo(L, y); c.lineTo(L + pw, y); c.stroke();
-      if (nat) {
+      if (nat && lastLabelY - y >= 12) { // skip labels that would collide on a short plot
         c.fillStyle = pc === 0 ? col.ink : col.muted;
         c.fillText(NATURAL_LABEL[pc] + (Math.floor(m / 12) - 1), L - 8, y);
+        lastLabelY = y;
       }
     }
 
@@ -507,7 +523,7 @@
     }
     ensureCtx(); // inside the tap, so the browser allows audio
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+      stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: !!state.agc } });
     } catch (e) {
       const name = e && e.name;
       showMsg(name === 'NotAllowedError' || name === 'SecurityError'
@@ -545,7 +561,7 @@
     setStatus('off', 'Microphone off');
     lastVoiced = null;
     showNote(null);
-    setLevel(-70);
+    setLevel(METER_MIN);
     if (!tp.playing && audioCtx) audioCtx.suspend().catch(() => {});
     releaseWake();
     draw();
@@ -736,6 +752,31 @@
   a4In.addEventListener('change', () => { state.a4 = clamp(Number(a4In.value) || 440, 415, 466); a4In.value = String(state.a4); save(); });
   sensIn.addEventListener('input', () => { state.sens = Number(sensIn.value); setGate(); save(); });
 
+  agcCb.addEventListener('change', () => {
+    state.agc = agcCb.checked;
+    save();
+    const track = stream && stream.getAudioTracks()[0];
+    if (track && track.applyConstraints) track.applyConstraints({ autoGainControl: state.agc }).catch(() => {});
+    calibNote.textContent = 'Run "Set from room noise" again after changing this.';
+  });
+
+  // Measure the room for two seconds and put the threshold just above it: as sensitive as the room allows.
+  calibBtn.addEventListener('click', async () => {
+    if (calib) return;
+    if (!state.running && !(await start())) return;
+    calib = { max: -120, n: 0 };
+    calibBtn.disabled = true;
+    calibNote.textContent = 'Stay quiet for two seconds…';
+    setTimeout(() => {
+      const c = calib; calib = null; calibBtn.disabled = false;
+      if (!state.running || c.n < 10) { calibNote.textContent = 'The measurement was interrupted. Try again.'; return; }
+      state.sens = Math.round(sensFromGate(clamp(c.max + 8, -75, -30)));
+      sensIn.value = String(state.sens);
+      setGate(); save();
+      calibNote.textContent = 'Room noise is about ' + Math.round(c.max) + ' dB, so the threshold is now ' + Math.round(gateDb) + ' dB.';
+    }, 2000);
+  });
+
   partSel.addEventListener('change', () => {
     if (!score) return;
     partIdx = Number(partSel.value);
@@ -804,7 +845,7 @@
 
   /* ---------- start up ---------- */
 
-  setLevel(-70);
+  setLevel(METER_MIN);
   showNote(null);
   updateEmpty();
   resize();

@@ -28,6 +28,9 @@ Open the score in MuseScore and choose **File, Export, MIDI**. Each voice part b
 | Octave | "Any octave counts" accepts your note an octave above or below the target. "Exact octave" does not. |
 | Pickup beats | Sets bar 1 after a pickup measure, so bar numbers match your score. MIDI does not store pickups. |
 | Voice range | "Fit to score" frames your part. Other choices frame a voice range, and "Follow me" tracks your voice. |
+| Sensitivity | The level below which the microphone is ignored. Raise it to catch quiet singing, lower it if noise shows up. |
+| Set from room noise | Listens to the room for two seconds and sets the lowest threshold that ignores it. Do this in a quiet moment. |
+| Boost quiet microphones | Turns on the phone's automatic gain. Helps with very quiet input, but can raise room noise between notes. |
 
 Pause on a note and sing: the readout shows the cents from that note, so you can check one note at a time.
 

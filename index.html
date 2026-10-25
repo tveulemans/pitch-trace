@@ -122,8 +122,15 @@
         <label class="field" style="display:grid;gap:4px">Sensitivity
           <input type="range" id="sens" min="0" max="100" value="50">
         </label>
+        <div class="field" style="display:grid;gap:6px;justify-items:start">
+          <button class="btn small" id="calibrate" type="button">Set from room noise</button>
+          <span id="calibNote" aria-live="polite">Finds the lowest threshold that ignores your room.</span>
+        </div>
+        <label class="field">Boost quiet microphones
+          <input type="checkbox" id="agc">
+        </label>
         <button class="btn small" id="removeSong" type="button" hidden>Remove this song</button>
-        <p class="help">Export a MIDI file from MuseScore (File, Export, MIDI) and load it here. Songs stay on this device only; nothing is uploaded. If the song starts with a pickup measure, enter its length in beats so bar numbers match your score. Pitches are sounding pitch in equal temperament. Use headphones with the guide tone, otherwise the microphone hears it too. Raise sensitivity if quiet notes are missed, lower it if background noise triggers the trace.</p>
+        <p class="help">Export a MIDI file from MuseScore (File, Export, MIDI) and load it here. Songs stay on this device only; nothing is uploaded. If the song starts with a pickup measure, enter its length in beats so bar numbers match your score. Pitches are sounding pitch in equal temperament. Use headphones with the guide tone, otherwise the microphone hears it too. If quiet notes are missed, press "Set from room noise" while the room is quiet, or raise sensitivity by hand. Lower it if background noise or a humming appliance triggers the trace. "Boost quiet microphones" turns on the phone's automatic gain; it helps with very quiet input but can make the room noise louder between notes.</p>
       </div>
     </details>
   </div>
