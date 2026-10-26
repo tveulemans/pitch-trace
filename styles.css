@@ -107,6 +107,11 @@
   .transport .row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
   .pos { margin-left: auto; font-family: var(--mono); font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
   #seek { width: 100%; margin: 0; accent-color: var(--accent); }
+  .lyric-line { text-align: center; line-height: 1.25; min-width: 0; }
+  .lyric-line .cur { font-size: clamp(17px, 4.8vw, 24px); font-weight: 600; min-height: 1.25em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--ink); }
+  .lyric-line .cur .past { color: var(--muted); }
+  .lyric-line .cur .now { color: var(--accent-ink); background: var(--accent); border-radius: 4px; padding: 0 3px; margin: 0 -3px; }
+  .lyric-line .nxt { font-size: clamp(13px, 3.6vw, 16px); min-height: 1.25em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
   .range-info { margin: 0; font-size: 13px; color: var(--muted); }
   .range-info b { color: var(--ink); font-family: var(--mono); font-weight: 600; }
   input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent); margin: 0; }

@@ -23,9 +23,9 @@
 
   const state = {
     running: false, a4: 440, windowSec: 12, range: 'auto', sens: 50,
-    speed: 1, countIn: true, guideMine: true, guideOthers: true, octave: 'any', partName: '', agc: false, names: 'letters', staff: 'off', lyrics: true, exercise: 'five', exLo: 40, exHi: 62,
+    speed: 1, countIn: true, guideMine: true, guideOthers: true, octave: 'any', partName: '', agc: false, names: 'letters', staff: 'off', lyrics: true, lyricLane: false, exercise: 'five', exLo: 40, exHi: 62,
   };
-  const PERSIST = ['a4', 'windowSec', 'range', 'sens', 'speed', 'countIn', 'guideMine', 'guideOthers', 'octave', 'partName', 'agc', 'names', 'staff', 'lyrics', 'exercise', 'exLo', 'exHi'];
+  const PERSIST = ['a4', 'windowSec', 'range', 'sens', 'speed', 'countIn', 'guideMine', 'guideOthers', 'octave', 'partName', 'agc', 'names', 'staff', 'lyrics', 'lyricLane', 'exercise', 'exLo', 'exHi'];
   try {
     const saved = JSON.parse(localStorage.getItem('pitchtrace.settings') || '{}');
     for (const k of PERSIST) if (saved[k] != null) state[k] = saved[k];
@@ -36,6 +36,7 @@
   if (state.names !== 'solfege') state.names = 'letters';
   if (state.staff !== 'bass') state.staff = 'off';
   state.lyrics = state.lyrics !== false;
+  state.lyricLane = state.lyricLane === true;
   state.exLo = Math.min(84, Math.max(28, Math.round(Number(state.exLo)) || 40));
   state.exHi = Math.min(84, Math.max(28, Math.round(Number(state.exHi)) || 62));
   if (state.range === 'score' || !(state.range === 'auto' || RANGES[state.range])) state.range = 'auto';
@@ -62,11 +63,11 @@
   const partField = $('partField'), partSel = $('part'), scoreRangeOpt = $('scoreRange');
   const octSel = $('octave'), countInCb = $('countIn'), mineCb = $('guideMine'), othersCb = $('guideOthers');
   const othersField = $('othersField'), pickupField = $('pickupField'), pickupIn = $('pickup'), removeBtn = $('removeSong');
-  const agcCb = $('agc'), calibBtn = $('calibrate'), calibNote = $('calibNote'), rangeInfo = $('rangeInfo'), namesSel = $('names'), staffSel = $('staff'), lyricsCb = $('lyrics');
+  const agcCb = $('agc'), calibBtn = $('calibrate'), calibNote = $('calibNote'), rangeInfo = $('rangeInfo'), namesSel = $('names'), staffSel = $('staff'), lyricsCb = $('lyrics'), laneCb = $('lyricLane'), lineEl = $('lyricLine');
   agcCb.checked = !!state.agc;
   namesSel.value = state.names;
   staffSel.value = state.staff;
-  lyricsCb.checked = state.lyrics;
+  lyricsCb.checked = state.lyrics; laneCb.checked = state.lyricLane;
 
   rangeSel.value = state.range; winSel.value = String(state.windowSec); a4In.value = String(state.a4); sensIn.value = String(state.sens);
   speedSel.value = String(state.speed); if (speedSel.value !== String(state.speed)) { speedSel.value = '1'; state.speed = 1; }
@@ -410,6 +411,53 @@
     c.restore();
   }
 
+  /* The line being sung, in large type above the controls: the current syllable is highlighted, the next line is dimmed.
+     MIDI has no line breaks, so a new line starts after a rest, after a "/" marker, after sentence punctuation, or when the line gets long. */
+  let linesFor = null, lines = [], lineIdx = -2, sylIdx = -2, lineSpans = [];
+
+  function buildLines(ly) {
+    const notes = score.parts[partIdx].notes;
+    const out = [];
+    let cur = null, chars = 0, ni = 0, prevEnd = 0;
+    for (const e of ly) {
+      while (ni < notes.length && notes[ni].start < e.start - 1e-6) { prevEnd = Math.max(prevEnd, notes[ni].end); ni++; }
+      const gap = e.start - prevEnd, beat = score.meterAt(e.start).beatSec;
+      const prev = cur && cur[cur.length - 1];
+      const brk = !cur || e.newline || (prev && !prev.join && (gap > beat * 1.2 || (/[.!?;:]$/.test(prev.text) && chars >= 12) || chars + e.text.length > 34));
+      if (brk) { cur = []; out.push(cur); chars = 0; }
+      cur.push(e); chars += e.text.length + (e.join ? 0 : 1);
+    }
+    return out;
+  }
+
+  function updateLyricLine(now) {
+    const ly = score && state.lyrics ? lyricsOf() : [];
+    if (!ly.length) { if (!lineEl.hidden) { lineEl.hidden = true; linesFor = null; } return; }
+    lineEl.hidden = false;
+    if (linesFor !== ly) { linesFor = ly; lines = buildLines(ly); lineIdx = -2; sylIdx = -2; }
+    // The current line: the last one that has started (a little early, so the next line is ready during a rest).
+    let li = 0;
+    for (let k = 0; k < lines.length; k++) { if (lines[k][0].start - 0.6 <= now) li = k; else break; }
+    let si = -1;
+    const L = lines[li];
+    for (let k = 0; k < L.length; k++) { if (L[k].start <= now) si = k; else break; }
+    if (li !== lineIdx) {
+      lineIdx = li; sylIdx = -2;
+      const curEl = lineEl.firstElementChild, nxtEl = lineEl.lastElementChild;
+      curEl.textContent = ''; lineSpans = [];
+      L.forEach((e) => {
+        const sp = document.createElement('span');
+        sp.textContent = e.text + (e.join ? '' : ' ');
+        curEl.append(sp); lineSpans.push(sp);
+      });
+      nxtEl.textContent = lines[li + 1] ? lines[li + 1].map((e) => e.text + (e.join ? '' : ' ')).join('') : '';
+    }
+    if (si !== sylIdx) {
+      sylIdx = si;
+      lineSpans.forEach((sp, k) => { sp.className = k < si ? 'past' : k === si ? 'now' : ''; });
+    }
+  }
+
   // Lyrics of the chosen part; if that track has none, use the first track that does (they are timed by their own events).
   function lyricsOf() {
     if (!score) return [];
@@ -450,8 +498,9 @@
     c.setTransform(dpr, 0, 0, dpr, 0, 0);
     c.clearRect(0, 0, cssW, cssH);
     updateView(now, !(state.running || tp.playing));
+    updateLyricLine(now);
 
-    const hasLyrics = !!(score && state.lyrics && lyricsOf().length);
+    const hasLyrics = !!(score && state.lyrics && state.lyricLane && lyricsOf().length);
     const laneH = hasLyrics ? 26 : 0;
     const L = 44, R = 12, T = score ? 20 : 8, B = 18 + laneH;
     const pw = cssW - L - R, ph = cssH - T - B;
@@ -810,6 +859,7 @@
     try { sc = loadMidi(rec.bytes, rec.name); } catch (e) { showMsg((e && e.message) || 'That file could not be read.'); return false; }
     showMsg('');
     pause();
+    linesFor = null;
     score = sc; song = rec; flats = rec.exercise ? true : sc.flats;
     let idx = rec.part != null && rec.part < sc.parts.length ? rec.part : -1;
     const want = (state.partName || '').toLowerCase();
@@ -837,6 +887,7 @@
     scoreRangeOpt.disabled = true; scoreRangeOpt.hidden = true;
     if (state.range === 'score') { state.range = 'auto'; rangeSel.value = 'auto'; }
     pts.length = 0; med.length = 0; lastVoiced = null; breakPushed = true;
+    lineEl.hidden = true; linesFor = null;
     lsSet('pitchtrace.last', null);
     fillSongs(); updateEmpty(); showNote(null); snapView(); draw();
   }
@@ -891,6 +942,7 @@
   othersCb.addEventListener('change', () => { state.guideOthers = othersCb.checked; if (!state.guideOthers) stopVoices((v) => !v.mine); save(); });
   octSel.addEventListener('change', () => { state.octave = octSel.value; save(); });
   lyricsCb.addEventListener('change', () => { state.lyrics = lyricsCb.checked; save(); draw(); });
+  laneCb.addEventListener('change', () => { state.lyricLane = laneCb.checked; save(); draw(); });
   staffSel.addEventListener('change', () => { state.staff = staffSel.value; save(); draw(); });
   namesSel.addEventListener('change', () => {
     state.names = namesSel.value;
@@ -935,7 +987,7 @@
     partIdx = Number(partSel.value);
     song.part = partIdx;
     state.partName = score.parts[partIdx].name.toLowerCase();
-    buildQueue(); rebuildBars(); updateRangeInfo();
+    buildQueue(); rebuildBars(); updateRangeInfo(); linesFor = null;
     if (tp.playing) rebase(tlNow());
     pts.length = 0; breakPushed = true;
     persistSong(song); save(); snapView(); draw();

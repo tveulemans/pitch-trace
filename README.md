@@ -35,7 +35,8 @@ If the MIDI file contains lyric events, the words scroll under the grid with the
 | Count-in | One bar of clicks before playback starts. |
 | Note names | Letters (C D E) or fixed-do solfège (Do Re Mi), everywhere in the app. Do is always C, and octave numbers follow the usual scientific numbering, so middle C is Do4. |
 | Staff overlay | Draws the five bass-clef lines (G2 B2 D3 F3 A3) over the grid, with the clé de fa and ledger lines for notes above or below the staff. The lines sit at their true pitch, so notes with a flat or sharp sit just off their line. |
-| Show lyrics | Draws the words under the grid, scrolling with the notes; the syllable being sung is highlighted. Needs lyrics inside the MIDI file (see below). |
+| Show lyrics | Shows the line being sung in large type under the grid, with the current syllable highlighted and the next line dimmed. Lines break after rests and sentence ends. Needs lyrics inside the MIDI file (see below). |
+| Lyrics under the notes | Also draws each syllable under its note, scrolling with the grid. Off by default because syllables get cut off when notes are short. |
 | Octave | "Any octave counts" accepts your note an octave above or below the target. "Exact octave" does not. |
 | Pickup beats | Sets bar 1 after a pickup measure, so bar numbers match your score. MIDI does not store pickups. |
 | Voice range | "Fit to score" frames your part. Other choices frame a voice range, and "Follow me" tracks your voice. |
