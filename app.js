@@ -63,7 +63,7 @@
   const partField = $('partField'), partSel = $('part'), scoreRangeOpt = $('scoreRange');
   const octSel = $('octave'), countInCb = $('countIn'), mineCb = $('guideMine'), othersCb = $('guideOthers');
   const othersField = $('othersField'), pickupField = $('pickupField'), pickupIn = $('pickup'), removeBtn = $('removeSong');
-  const agcCb = $('agc'), calibBtn = $('calibrate'), calibNote = $('calibNote'), rangeInfo = $('rangeInfo'), namesSel = $('names'), staffSel = $('staff'), lyricsCb = $('lyrics'), laneCb = $('lyricLane'), lineEl = $('lyricLine');
+  const agcCb = $('agc'), calibBtn = $('calibrate'), calibNote = $('calibNote'), rangeInfo = $('rangeInfo'), namesSel = $('names'), staffSel = $('staff'), lyricsCb = $('lyrics'), laneCb = $('lyricLane'), lineEl = $('lyricLine'), fixBtn = $('lyricFix');
   agcCb.checked = !!state.agc;
   namesSel.value = state.names;
   staffSel.value = state.staff;
@@ -413,7 +413,7 @@
 
   /* The line being sung, in large type above the controls: the current syllable is highlighted, the next line is dimmed.
      MIDI has no line breaks, so a new line starts after a rest, after a "/" marker, after sentence punctuation, or when the line gets long. */
-  let linesFor = null, lines = [], lineIdx = -2, sylIdx = -2, lineSpans = [];
+  let linesFor = null, lines = [], lineIdx = -2, sylIdx = -2, lineSpans = [], lineData = [], fixing = false;
 
   function buildLines(ly) {
     const notes = score.parts[partIdx].notes;
@@ -432,6 +432,7 @@
 
   function updateLyricLine(now) {
     const ly = score && state.lyrics ? lyricsOf() : [];
+    fixBtn.hidden = !(song && !song.exercise);
     if (!ly.length) { if (!lineEl.hidden) { lineEl.hidden = true; linesFor = null; } return; }
     lineEl.hidden = false;
     if (linesFor !== ly) { linesFor = ly; lines = buildLines(ly); lineIdx = -2; sylIdx = -2; }
@@ -445,9 +446,11 @@
       lineIdx = li; sylIdx = -2;
       const curEl = lineEl.firstElementChild, nxtEl = lineEl.lastElementChild;
       curEl.textContent = ''; lineSpans = [];
+      lineData = L;
+      curEl.classList.toggle('fixing', fixing);
       L.forEach((e) => {
         const sp = document.createElement('span');
-        sp.textContent = e.text + (e.join ? '' : ' ');
+        sp.textContent = e.text + (fixing ? (e.join ? '-' : ' ') : (e.join ? '' : ' '));
         curEl.append(sp); lineSpans.push(sp);
       });
       nxtEl.textContent = lines[li + 1] ? lines[li + 1].map((e) => e.text + (e.join ? '' : ' ')).join('') : '';
@@ -457,6 +460,28 @@
       lineSpans.forEach((sp, k) => { sp.className = k < si ? 'past' : k === si ? 'now' : ''; });
     }
   }
+
+  /* Fixing word breaks: in this mode every syllable shows its hyphen (joined to the next) or a space; tapping one flips it.
+     The fixes are kept with the song, keyed by the syllable's position in its track. */
+  fixBtn.addEventListener('click', () => {
+    fixing = !fixing;
+    fixBtn.textContent = fixing ? 'Done' : 'Fix word breaks';
+    fixBtn.setAttribute('aria-pressed', String(fixing));
+    if (fixing && tp.playing) pause();
+    lineIdx = -2; draw();
+  });
+  lineEl.firstElementChild.addEventListener('click', (ev) => {
+    if (!fixing || !song) return;
+    const sp = ev.target.closest('span');
+    const k = sp ? lineSpans.indexOf(sp) : -1;
+    if (k < 0) return;
+    const e = lineData[k];
+    e.join = !e.join;
+    song.fixes = song.fixes || {};
+    if (e.join === e.orig) delete song.fixes[e.key]; else song.fixes[e.key] = e.join;
+    persistSong(song);
+    linesFor = null; draw();
+  });
 
   // Lyrics of the chosen part; if that track has none, use the first track that does (they are timed by their own events).
   function lyricsOf() {
@@ -859,7 +884,11 @@
     try { sc = loadMidi(rec.bytes, rec.name); } catch (e) { showMsg((e && e.message) || 'That file could not be read.'); return false; }
     showMsg('');
     pause();
-    linesFor = null;
+    linesFor = null; fixing = false; fixBtn.textContent = 'Fix word breaks';
+    sc.parts.forEach((p, pi) => p.lyrics.forEach((e, i) => {
+      e.key = pi + ':' + i; e.orig = e.join;
+      if (rec.fixes && e.key in rec.fixes) e.join = !!rec.fixes[e.key];
+    }));
     score = sc; song = rec; flats = rec.exercise ? true : sc.flats;
     let idx = rec.part != null && rec.part < sc.parts.length ? rec.part : -1;
     const want = (state.partName || '').toLowerCase();

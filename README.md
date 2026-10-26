@@ -25,6 +25,8 @@ Open **Exercises**, choose a warm-up and the lowest and highest note you want, t
 
 If the MIDI file contains lyric events, the words scroll under the grid with the notes. MuseScore 4 writes them when you export; older MuseScore versions do not. A file without lyrics simply shows none. If your part's track has no lyrics, the first track that has some is used.
 
+If a word break is wrong (a hyphen between two different words, or a missing one), press **Fix word breaks** under the lyrics. Every syllable then shows a hyphen (joined to the next) or a space; tap one to flip it. The fixes are kept with the song on this device. The spelling of the words itself cannot be edited.
+
 ### Controls
 
 | Control | What it does |
