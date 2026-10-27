@@ -21,6 +21,12 @@ Open the score in MuseScore and choose **File, Export, MIDI**. Each voice part b
 
 Open **Exercises**, choose a warm-up and the lowest and highest note you want, then press **Start exercise**. Five are built in: long notes, a five-note scale, Do-Mi-Sol, leaps from Do, and a major scale. Each starts in the middle of your range, climbs in whole tones, descends, and returns, so every note stays within the limits you set. Loading a song sets the range to your part. The syllables (Do Re Mi) show under the grid, and the speed control slows an exercise down.
 
+### Scores and progress
+
+Play an exercise or a song from the start to the end and the app scores the run: the share of the note time you spent within 15 cents of the target. Silence and wrong notes count as out of tune; the first moment of each note is forgiven while you settle. The result card also shows how much you sang, whether you tend to be sharp or flat, how steady your pitch is, and your weakest notes. To score a run you stop early, pause and press **Score this run**: only the notes already finished count. Seeking within a run cancels it.
+
+Open **Progress** to see every scored run as a chart for one exercise or song: in tune (%), flat or sharp (cents), or steadiness. The line is the average of your last five runs, and tapping a point shows that run. Runs are kept in this browser only, so another device starts with its own history. Runs of an exercise at different ranges or speeds share one chart, which makes small changes harder to read.
+
 ### Lyrics
 
 If the MIDI file contains lyric events, the words scroll under the grid with the notes. MuseScore 4 writes them when you export; older MuseScore versions do not. A file without lyrics simply shows none. If your part's track has no lyrics, the first track that has some is used.
@@ -74,6 +80,7 @@ then open `http://localhost:8000`.
 | `styles.css` | Styling, light and dark themes |
 | `pitch.js` | YIN pitch detection |
 | `midi.js` | MIDI file reader: parts, note times in seconds, bar grid, lyrics |
+| `scoring.js` | Scores a run and summarises runs over time |
 | `exercises.js` | Builds the training exercises as MIDI for your range |
 | `library.js` | Keeps loaded songs in the browser (IndexedDB) |
 | `app.js` | Microphone, playback, drawing, settings |
@@ -82,7 +89,7 @@ then open `http://localhost:8000`.
 | `icons/` | App icons |
 | `tests/` | Checks for the detector and the MIDI reader |
 
-Run the tests with `node tests/pitch.test.js && node tests/midi.test.js && node tests/exercises.test.js`. Score files (`.mid`, `.mscz`) are listed in `.gitignore`, so they are not committed by accident; keep arrangements you do not own out of a public repository.
+Run the tests with `node tests/pitch.test.js && node tests/midi.test.js && node tests/exercises.test.js && node tests/scoring.test.js`. Score files (`.mid`, `.mscz`) are listed in `.gitignore`, so they are not committed by accident; keep arrangements you do not own out of a public repository.
 
 ## Updating
 

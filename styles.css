@@ -116,6 +116,11 @@
   .lyric-line .cur.fixing { text-overflow: clip; }
   .lyric-line .fix { appearance: none; border: 0; background: transparent; color: var(--muted); font-size: 12px; text-decoration: underline; cursor: pointer; padding: 6px 0; }
   .lyric-line .fix[aria-pressed="true"] { color: var(--accent); font-weight: 700; }
+  .result { border: 1px solid var(--grid-strong); border-radius: 10px; background: var(--panel); padding: 10px 12px; display: grid; gap: 4px; font-size: 14px; }
+  .result p { margin: 0; color: var(--muted); }
+  .res-top { display: flex; align-items: baseline; gap: 12px; }
+  .res-score { font-family: var(--mono); font-size: 34px; font-weight: 700; color: var(--accent); line-height: 1; }
+  .res-detail { color: var(--ink); font-size: 13px; }
   .range-info { margin: 0; font-size: 13px; color: var(--muted); }
   .range-info b { color: var(--ink); font-family: var(--mono); font-weight: 600; }
   input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent); margin: 0; }

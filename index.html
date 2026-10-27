@@ -50,10 +50,18 @@
 
   <div class="lyric-line" id="lyricLine" hidden aria-label="Lyrics"><div class="cur"></div><div class="nxt"></div><button class="fix" id="lyricFix" type="button" aria-pressed="false" hidden>Fix word breaks</button></div>
 
+  <section class="result" id="result" hidden aria-live="polite">
+    <div class="res-top"><span class="res-score" id="resScore"></span><span class="res-detail" id="resDetail"></span></div>
+    <p id="resWeak"></p>
+    <p id="resTrend"></p>
+    <button class="btn small" id="resClose" type="button">Close</button>
+  </section>
+
   <section class="transport" id="transport" aria-label="Playback" hidden>
     <div class="row">
       <button class="btn primary" id="play" type="button" data-on="false">Play</button>
       <button class="btn" id="restart" type="button">Restart</button>
+      <button class="btn" id="scoreRun" type="button" hidden>Score this run</button>
       <label class="field">Speed
         <select id="speed">
           <option value="0.5">50%</option>
@@ -91,6 +99,23 @@
       </select>
     </label>
     <span class="field">Input <span class="level" id="levelBox"><b id="levelBar"></b><u id="gateMark"></u></span></span>
+    <details class="settings" id="progPanel">
+      <summary>Progress</summary>
+      <div class="grid">
+        <label class="field">Exercise or song <select id="progItem"></select></label>
+        <label class="field">Show
+          <select id="progMetric">
+            <option value="score">In tune (%)</option>
+            <option value="bias">Flat or sharp (cents)</option>
+            <option value="wobble">Steadiness (cents)</option>
+          </select>
+        </label>
+        <canvas id="progCv" style="grid-column:1/-1;width:100%;height:190px;display:block;background:var(--panel);border:1px solid var(--grid);border-radius:10px"></canvas>
+        <p class="help" id="progSummary" style="color:var(--ink)"></p>
+        <p class="help" id="progInfo"></p>
+        <button class="btn small" id="progClear" type="button" hidden>Clear history of this item</button>
+      </div>
+    </details>
     <details class="settings" id="exPanel">
       <summary>Exercises</summary>
       <div class="grid">
@@ -172,6 +197,7 @@
 
 <script src="pitch.js"></script>
 <script src="midi.js"></script>
+<script src="scoring.js"></script>
 <script src="exercises.js"></script>
 <script src="library.js"></script>
 <script src="app.js"></script>

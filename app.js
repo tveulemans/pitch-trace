@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const { yin, median, FMIN, FMAX, loadMidi, library, exercises } = window.PitchTrace;
+  const { yin, median, FMIN, FMAX, loadMidi, library, exercises, scoring } = window.PitchTrace;
 
   const $ = (id) => document.getElementById(id);
   // Plain letters, because the flat and sharp symbols are missing from many monospace fonts.
@@ -320,6 +320,7 @@
     const hit = score && (rec || !tp.playing) ? targetHit(m, t) : null;
     const e = hit ? hit.e : score ? null : m - Math.round(m);
     lastVoiced = { w, t, m, e };
+    if (run && rec && tp.playing && hit) run.frames.push({ t, e: hit.e, dt: 0.032 * state.speed });
     if (rec) {
       pts.push({ t, m, e });
       breakPushed = false;
@@ -413,6 +414,7 @@
 
   /* The line being sung, in large type above the controls: the current syllable is highlighted, the next line is dimmed.
      MIDI has no line breaks, so a new line starts after a rest, after a "/" marker, after sentence punctuation, or when the line gets long. */
+  let run = null;
   let linesFor = null, lines = [], lineIdx = -2, sylIdx = -2, lineSpans = [], lineData = [], fixing = false;
 
   function buildLines(ly) {
@@ -772,6 +774,7 @@
   function setPos(p) {
     p = clamp(p, 0, score.durationSec);
     tp.pos = p;
+    run = null; refreshScoreBtn();
     dropFuture(p);
     if (tp.playing) rebase(p);
     updateTransportUI();
@@ -796,6 +799,8 @@
     tp.basePos = pos0 - nb * mi.beatSec;
     tp.baseWall = wall();
     tp.playing = true;
+    if (pos0 <= tp.startPos + 0.05) { run = { frames: [], part: partIdx, reach: 0 }; hideResult(); }
+    refreshScoreBtn();
     qi = 0; ki = 0;
     dropFuture(tp.basePos);
     clearInterval(schedTimer);
@@ -811,12 +816,14 @@
     if (!tp.playing) return;
     const p = clamp(tlNow(), 0, score.durationSec);
     tp.playing = false;
+    if (run) run.reach = Math.max(run.reach, atEnd ? score.durationSec : p);
     tp.pos = atEnd ? score.durationSec : Math.max(p, tp.pos0);
     clearInterval(schedTimer); schedTimer = 0;
     stopVoices();
     playBtn.textContent = 'Play'; playBtn.dataset.on = 'false';
     showNote(null);
     releaseWake();
+    if (atEnd && run) finishRun(Infinity); else refreshScoreBtn();
     updateTransportUI();
     draw();
   }
@@ -884,6 +891,7 @@
     try { sc = loadMidi(rec.bytes, rec.name); } catch (e) { showMsg((e && e.message) || 'That file could not be read.'); return false; }
     showMsg('');
     pause();
+    run = null; hideResult();
     linesFor = null; fixing = false; fixBtn.textContent = 'Fix word breaks';
     sc.parts.forEach((p, pi) => p.lyrics.forEach((e, i) => {
       e.key = pi + ':' + i; e.orig = e.join;
@@ -916,11 +924,181 @@
     scoreRangeOpt.disabled = true; scoreRangeOpt.hidden = true;
     if (state.range === 'score') { state.range = 'auto'; rangeSel.value = 'auto'; }
     pts.length = 0; med.length = 0; lastVoiced = null; breakPushed = true;
-    lineEl.hidden = true; linesFor = null;
+    lineEl.hidden = true; linesFor = null; run = null; hideResult(); refreshScoreBtn();
     lsSet('pitchtrace.last', null);
     fillSongs(); updateEmpty(); showNote(null); snapView(); draw();
   }
 
+
+
+  /* ---------- scoring and progress ---------- */
+
+  const resultEl = $('result'), scoreBtn = $('scoreRun');
+  const progItem = $('progItem'), progMetric = $('progMetric'), progCv = $('progCv'), progInfo = $('progInfo'), progSummary = $('progSummary'), progClear = $('progClear'), progPanel = $('progPanel');
+  const HKEY = 'pitchtrace.history';
+  const METRICS = {
+    score: { label: 'In tune (%)', get: (h) => h.score },
+    bias: { label: 'Flat or sharp (cents)', get: (h) => h.bias },
+    wobble: { label: 'Steadiness (cents, lower is better)', get: (h) => h.wobble },
+  };
+  let history = (() => {
+    try { const a = JSON.parse(lsGet(HKEY) || '[]'); return Array.isArray(a) ? a.filter((h) => h && typeof h.k === 'string' && Number.isFinite(h.score)) : []; } catch (e) { return []; }
+  })();
+  let progSel = -1;
+
+  const keyOf = () => (song.exercise ? 'ex:' + song.exId : 'song:' + song.id + '|' + score.parts[partIdx].name);
+  const labelOf = () => (song.exercise ? song.name : song.name.replace(/\.(mid|midi|kar)$/i, '') + (score.parts.length > 1 ? ' · ' + score.parts[partIdx].name : ''));
+  const entriesFor = (k) => history.filter((h) => h.k === k);
+
+  function refreshScoreBtn() {
+    scoreBtn.hidden = !(run && !tp.playing && run.frames.length > 15);
+  }
+
+  function hideResult() { resultEl.hidden = true; }
+
+  function finishRun(until) {
+    const r = run; run = null; refreshScoreBtn();
+    if (!r || !score) return;
+    const res = scoring.scoreRun(score.parts[r.part].notes, r.frames, { good: GOOD, until: until === Infinity ? Infinity : r.reach });
+    if (!res) { showMsg('Nothing to score yet: sing through at least one whole note first.'); return; }
+    if (res.sung === 0 && until !== Infinity) { showMsg('No singing was heard during that run, so it was not scored.'); return; }
+    const key = keyOf();
+    const prev = entriesFor(key);
+    history.push({ k: key, label: labelOf(), t: Date.now(), score: res.score, sung: res.sung, bias: res.bias, wobble: res.wobble, notes: res.notes, partial: until !== Infinity, speed: state.speed, lo: song.exercise ? song.lo : score.parts[r.part].lo, hi: song.exercise ? song.hi : score.parts[r.part].hi });
+    if (history.length > 600) history = history.slice(-600);
+    lsSet(HKEY, JSON.stringify(history));
+    showResult(res, prev, until !== Infinity);
+    progSel = -1; fillProgItems(key); drawProgress();
+  }
+
+  function showResult(res, prev, partial) {
+    $('resScore').textContent = res.score + '%';
+    const bias = Math.abs(res.bias) < 3 ? 'centred on the notes' : (res.bias > 0 ? 'sharp' : 'flat') + ' by about ' + Math.round(Math.abs(res.bias)) + ' cents on average';
+    $('resDetail').textContent = 'of the note time within ' + GOOD + ' cents. You sang ' + res.sung + '% of the time, ' + bias + ', and your pitch wobbled by about ±' + Math.round(res.wobble) + ' cents.';
+    const weak = res.weakest.filter((w) => w.pct < 0.7).slice(0, 3);
+    $('resWeak').textContent = weak.length ? 'Weakest notes: ' + weak.map((w) => noteName(w.midi) + ' (' + Math.round(w.pct * 100) + '%)').join(', ') + '.' : 'No weak notes this time.';
+    let trend;
+    if (!prev.length) trend = 'First scored run of this: it is your starting point.';
+    else {
+      const d = res.score - prev[prev.length - 1].score;
+      trend = d === 0 ? 'Same as your last run.' : (d > 0 ? '+' : '−') + Math.abs(d) + ' points compared with your last run.';
+    }
+    $('resTrend').textContent = (partial ? 'Partial run, ' + res.notes + ' notes. ' : '') + trend;
+    resultEl.hidden = false;
+  }
+
+  scoreBtn.addEventListener('click', () => finishRun(0));
+  $('resClose').addEventListener('click', hideResult);
+
+  /* Progress chart: one point per scored run, with the average of the last five runs as a line. */
+  function fillProgItems(want) {
+    const latest = new Map();
+    for (const h of history) latest.set(h.k, h);
+    const keys = Array.from(latest.values()).sort((a, b) => b.t - a.t);
+    const cur = want || progItem.value || (song && score ? keyOf() : '');
+    progItem.innerHTML = '';
+    for (const h of keys) progItem.add(new Option(h.label + ' (' + entriesFor(h.k).length + ')', h.k));
+    if (keys.length) progItem.value = keys.some((h) => h.k === cur) ? cur : keys[0].k;
+  }
+
+  function fmtDate(t) { return new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }); }
+  function fmtStamp(t) { return fmtDate(t) + ' ' + new Date(t).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }); }
+
+  function pointColor(metric, v) {
+    if (metric === 'score') return v >= 80 ? col.good : v >= 50 ? col.warn : col.bad;
+    const a = Math.abs(v);
+    return a <= GOOD ? col.good : a <= CLOSE ? col.warn : col.bad;
+  }
+
+  function describe(h) {
+    const b = Math.abs(h.bias) < 3 ? 'centred' : Math.round(Math.abs(h.bias)) + ' cents ' + (h.bias > 0 ? 'sharp' : 'flat');
+    return fmtStamp(h.t) + ' · ' + h.score + '% in tune · ' + b + ' · ±' + Math.round(h.wobble) + ' cents wobble · speed ' + Math.round((h.speed || 1) * 100) + '%' + (h.partial ? ' · partial run' : '');
+  }
+
+  function drawProgress() {
+    if (!progPanel.open) return;
+    const list = entriesFor(progItem.value);
+    const r = progCv.getBoundingClientRect();
+    const d = window.devicePixelRatio || 1;
+    if (!r.width) return;
+    progCv.width = Math.round(r.width * d); progCv.height = Math.round(r.height * d);
+    const c = progCv.getContext('2d');
+    c.setTransform(d, 0, 0, d, 0, 0);
+    c.clearRect(0, 0, r.width, r.height);
+    progClear.hidden = !list.length;
+    if (!list.length) {
+      progSummary.textContent = history.length ? '' : 'Finish an exercise or a song from the start to see your first score here.';
+      progInfo.textContent = '';
+      return;
+    }
+    const m = progMetric.value, spec = METRICS[m];
+    const vals = list.map(spec.get);
+    let lo = 0, hi = 100;
+    if (m === 'bias') { const a = Math.max(30, Math.ceil(Math.max.apply(null, vals.map(Math.abs)) / 10) * 10); lo = -a; hi = a; }
+    if (m === 'wobble') { hi = Math.max(30, Math.ceil(Math.max.apply(null, vals) / 10) * 10); }
+    const L = 38, R = 12, T = 10, B = 24, w = r.width - L - R, h = r.height - T - B;
+    const y = (v) => T + h - ((v - lo) / (hi - lo)) * h;
+    const x = (i) => L + (vals.length < 2 ? w / 2 : (i / (vals.length - 1)) * w);
+    c.font = '10px ' + MONO; c.textBaseline = 'middle'; c.textAlign = 'right';
+    const ticks = m === 'bias' ? [lo, lo / 2, 0, hi / 2, hi] : [0, 1, 2, 3, 4].map((k) => lo + ((hi - lo) * k) / 4);
+    if (m === 'bias') { c.fillStyle = col.band; c.fillRect(L, y(GOOD), w, y(-GOOD) - y(GOOD)); }
+    if (m === 'score') { c.fillStyle = col.band; c.fillRect(L, y(100), w, y(80) - y(100)); }
+    for (const v of ticks) {
+      c.strokeStyle = v === 0 && m === 'bias' ? col.gridStrong : col.grid; c.lineWidth = 1;
+      c.beginPath(); c.moveTo(L, y(v)); c.lineTo(L + w, y(v)); c.stroke();
+      c.fillStyle = col.muted; c.fillText(String(Math.round(v)), L - 6, y(v));
+    }
+    c.textAlign = 'left'; c.textBaseline = 'alphabetic';
+    c.fillText(fmtDate(list[0].t), L, r.height - 6);
+    c.textAlign = 'right';
+    if (list.length > 1) c.fillText(fmtDate(list[list.length - 1].t), L + w, r.height - 6);
+    c.lineJoin = 'round'; c.lineCap = 'round';
+    if (vals.length > 1) {
+      c.strokeStyle = col.muted; c.globalAlpha = 0.5; c.lineWidth = 1.5;
+      c.beginPath(); vals.forEach((v, i) => (i ? c.lineTo(x(i), y(v)) : c.moveTo(x(i), y(v)))); c.stroke();
+      c.globalAlpha = 1;
+      const avg = scoring.rolling(vals, 5);
+      c.strokeStyle = col.accent; c.lineWidth = 3;
+      c.beginPath(); avg.forEach((v, i) => (i ? c.lineTo(x(i), y(v)) : c.moveTo(x(i), y(v)))); c.stroke();
+    }
+    vals.forEach((v, i) => {
+      c.fillStyle = pointColor(m, v);
+      c.beginPath(); c.arc(x(i), y(v), i === progSel ? 6 : 4, 0, Math.PI * 2); c.fill();
+      c.strokeStyle = i === progSel ? col.ink : col.panel; c.lineWidth = 2; c.stroke();
+    });
+    progCv.xs = vals.map((_, i) => x(i));
+    const s = scoring.summarize(list.map((e) => e.score));
+    let text = s.runs + (s.runs === 1 ? ' run' : ' runs') + ' · best ' + s.best + '% · last ' + s.last + '%';
+    if (s.k >= 2) { const dlt = Math.round(s.last5 - s.first5); text += ' · average of the last ' + s.k + ': ' + Math.round(s.last5) + '% against ' + Math.round(s.first5) + '% for the first ' + s.k + ' (' + (dlt >= 0 ? '+' : '−') + Math.abs(dlt) + ')'; }
+    progSummary.textContent = text;
+    progInfo.textContent = progSel >= 0 && list[progSel] ? describe(list[progSel]) : 'Tap a point for the details of that run. The line is the average of your last five runs.';
+  }
+
+  progCv.addEventListener('click', (ev) => {
+    const xs = progCv.xs;
+    if (!xs || !xs.length) return;
+    const px = ev.clientX - progCv.getBoundingClientRect().left;
+    let best = 0;
+    xs.forEach((v, i) => { if (Math.abs(v - px) < Math.abs(xs[best] - px)) best = i; });
+    progSel = best; drawProgress();
+  });
+  progItem.addEventListener('change', () => { progSel = -1; drawProgress(); });
+  progMetric.addEventListener('change', drawProgress);
+  progPanel.addEventListener('toggle', () => { fillProgItems(); drawProgress(); });
+  let clearTimer = 0;
+  progClear.addEventListener('click', () => {
+    if (!clearTimer) {
+      progClear.textContent = 'Tap again to clear';
+      clearTimer = setTimeout(() => { clearTimer = 0; progClear.textContent = 'Clear history of this item'; }, 3000);
+      return;
+    }
+    clearTimeout(clearTimer); clearTimer = 0; progClear.textContent = 'Clear history of this item';
+    history = history.filter((h) => h.k !== progItem.value);
+    lsSet(HKEY, JSON.stringify(history));
+    progSel = -1; fillProgItems(); drawProgress();
+  });
+  window.addEventListener('resize', drawProgress);
+  fillProgItems();
 
   /* ---------- exercises ---------- */
 
@@ -945,7 +1123,7 @@
   exGo.addEventListener('click', () => {
     let ex;
     try { ex = exercises.build(state.exercise, state.exLo, state.exHi); } catch (e) { showMsg('That exercise could not be built.'); return; }
-    const rec = { id: 'exercise', name: ex.name, bytes: ex.bytes.buffer, added: Date.now(), pickup: 0, part: 0, exercise: true };
+    const rec = { id: 'exercise', exId: state.exercise, lo: ex.lo, hi: ex.hi, name: ex.name, bytes: ex.bytes.buffer, added: Date.now(), pickup: 0, part: 0, exercise: true };
     if (!openSong(rec)) return;
     exNote.textContent = ex.widened
       ? 'Your range is narrower than this exercise, so it goes up to ' + noteName(ex.hi) + '.'
@@ -1016,7 +1194,7 @@
     partIdx = Number(partSel.value);
     song.part = partIdx;
     state.partName = score.parts[partIdx].name.toLowerCase();
-    buildQueue(); rebuildBars(); updateRangeInfo(); linesFor = null;
+    buildQueue(); rebuildBars(); updateRangeInfo(); linesFor = null; run = null; refreshScoreBtn();
     if (tp.playing) rebase(tlNow());
     pts.length = 0; breakPushed = true;
     persistSong(song); save(); snapView(); draw();
