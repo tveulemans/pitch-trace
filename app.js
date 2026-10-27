@@ -208,7 +208,7 @@
       const s = Math.max(n.start, tp.pos0);
       if (s >= horizon) break;
       qi++;
-      if (n.end <= p || !(n.mine ? state.guideMine : state.guideOthers)) continue;
+      if (n.end <= p || !(n.always || (n.mine ? state.guideMine : state.guideOthers))) continue;
       const from = Math.max(s, p);
       voice(at(from), (n.end - from) / state.speed, n.midi, n.mine);
     }
@@ -325,6 +325,7 @@
     const e = hit ? hit.e : score ? null : m - Math.round(m);
     lastVoiced = { w, t, m, e };
     if (run && rec && tp.playing) run.frames.push({ t, m, dt: adt * state.speed });
+    if (song && song.callResponse && rec && tp.playing) { recent.push({ t, m }); while (recent.length > 500) recent.shift(); }
     if (rec) {
       pts.push({ t, m, e });
       breakPushed = false;
@@ -620,12 +621,14 @@
 
     // Target notes for the chosen part.
     if (score) {
-      const notes = score.parts[partIdx].notes;
+      // In "Find the note" the notes stay hidden until they start, so the ear does the work first.
+      const cr = !!(song && song.callResponse);
+      const sets = cr ? [[score.parts[0].notes, col.muted], [score.parts[partIdx].notes, col.accent]] : [[score.parts[partIdx].notes, col.accent]];
       const h = clamp(semi * 0.66, 9, 26);
       c.font = '10px ' + MONO; c.textAlign = 'left'; c.textBaseline = 'middle';
-      for (const n of notes) {
+      for (const [notes, tone] of sets) for (const n of notes) {
         if (n.end < tL) continue;
-        if (n.start > tR) break;
+        if (n.start > tR || (cr && n.start > now)) break;
         const x1 = xOf(n.start), x2 = xOf(n.end), y = yOf(n.midi);
         const w = Math.max(2, x2 - x1 - 1);
         const active = n.start <= now && now < n.end;
@@ -642,9 +645,9 @@
         }
         roundRect(c, x1, y - h / 2, w, h, 4);
         c.globalAlpha = active ? 0.5 : 0.22 * a;
-        c.fillStyle = col.accent; c.fill();
+        c.fillStyle = tone; c.fill();
         c.globalAlpha = a;
-        c.strokeStyle = col.accent; c.lineWidth = active ? 2 : 1.25; c.stroke();
+        c.strokeStyle = tone; c.lineWidth = active ? 2 : 1.25; c.stroke();
         const label = noteName(n.midi);
         if (w > label.length * 6.2 + 10) { c.fillStyle = col.ink; c.fillText(label, x1 + 5, y + 0.5); }
       }
@@ -680,6 +683,7 @@
   function frame(ts) {
     raf = 0;
     if (state.running && analyser && ts - lastAnalysis >= 32) { lastAnalysis = ts; analyse(); }
+    if (tp.playing && song && song.callResponse) checkRound();
     if (tp.playing && tlNow() >= score.durationSec + 0.5) pause(true);
     draw();
     if (score && ts - lastUi >= 100) { lastUi = ts; updateTransportUI(); }
@@ -779,7 +783,7 @@
     p = clamp(p, 0, score.durationSec);
     tp.pos = p;
     run = null; refreshScoreBtn();
-    dropFuture(p);
+    dropFuture(p); resetRounds();
     if (tp.playing) rebase(p);
     updateTransportUI();
     draw();
@@ -803,6 +807,7 @@
     tp.basePos = pos0 - nb * mi.beatSec;
     tp.baseWall = wall();
     tp.playing = true;
+    resetRounds();
     if (pos0 <= tp.startPos + 0.05) { run = { frames: [], part: partIdx, reach: 0 }; hideResult(); }
     refreshScoreBtn();
     qi = 0; ki = 0;
@@ -838,7 +843,9 @@
 
   function buildQueue() {
     queue = [];
-    score.parts.forEach((p, i) => { for (const n of p.notes) queue.push({ start: n.start, end: n.end, midi: n.midi, mine: i === partIdx }); });
+    const cr = !!(song && song.callResponse);
+    // In "Find the note" only the call is played; your answer is never played for you.
+    score.parts.forEach((p, i) => { if (cr && i === partIdx) return; for (const n of p.notes) queue.push({ start: n.start, end: n.end, midi: n.midi, mine: i === partIdx || cr, always: cr }); });
     queue.sort((a, b) => a.start - b.start);
     qi = 0;
   }
@@ -864,8 +871,8 @@
     partSel.innerHTML = '';
     score.parts.forEach((p, i) => partSel.add(new Option(p.name, String(i))));
     partSel.value = String(partIdx);
-    partField.hidden = score.parts.length < 2;
-    othersField.hidden = score.parts.length < 2;
+    partField.hidden = score.parts.length < 2 || !!song.exercise;
+    othersField.hidden = score.parts.length < 2 || !!song.exercise;
   }
 
   // "Bass: lowest Ab2, highest C4 (1 octave and 4 semitones)"
@@ -917,6 +924,7 @@
     state.range = 'score'; rangeSel.value = 'score';
     lastPosText = ''; lastSeekInput = 0;
     if (!rec.exercise) lsSet('pitchtrace.last', rec.id);
+    resetRounds();
     fillSongs(); updateEmpty(); showNote(null); updateTransportUI(); snapView(); draw();
     return true;
   }
@@ -928,7 +936,7 @@
     scoreRangeOpt.disabled = true; scoreRangeOpt.hidden = true;
     if (state.range === 'score') { state.range = 'auto'; rangeSel.value = 'auto'; }
     pts.length = 0; med.length = 0; lastVoiced = null; breakPushed = true;
-    lineEl.hidden = true; linesFor = null; run = null; hideResult(); refreshScoreBtn();
+    lineEl.hidden = true; linesFor = null; run = null; hideResult(); refreshScoreBtn(); roundEl.hidden = true;
     lsSet('pitchtrace.last', null);
     fillSongs(); updateEmpty(); showNote(null); snapView(); draw();
   }
@@ -1144,6 +1152,37 @@
   window.addEventListener('resize', drawProgress);
   fillProgItems();
 
+
+  /* "Find the note": right after each answer the app says where you landed, first try and then at the end. */
+  const roundEl = $('roundMsg');
+  let recent = [], ri = 0;
+  const errOf = (m, note) => { const x = m - note.midi; return state.octave === 'any' ? fold(x) : x; };
+  const sayErr = (e) => (e == null ? 'not heard' : Math.abs(e) < 0.25 ? 'on the note' : fmtSemi(e) + (e < 0 ? ' too low' : ' too high'));
+  function medianErr(note, from, to) {
+    const es = [];
+    for (const f of recent) if (f.t >= from && f.t < to) es.push(errOf(f.m, note));
+    return es.length >= 3 ? median(es) : null;
+  }
+  function checkRound() {
+    const notes = score.parts[partIdx].notes;
+    const t = tlNow();
+    while (ri < notes.length && t >= notes[ri].end) {
+      const n = notes[ri];
+      const first = medianErr(n, n.start + 0.15, n.start + 0.8), last = medianErr(n, n.start + (n.end - n.start) * 0.5, n.end - 0.05);
+      const q = last == null ? 'idle' : Math.abs(last) < 0.5 ? 'good' : Math.abs(last) < 1.5 ? 'warn' : 'bad';
+      roundEl.dataset.q = q;
+      roundEl.textContent = 'Note ' + (ri + 1) + ' of ' + notes.length + ' (' + noteName(n.midi) + '): first try ' + sayErr(first) + (last == null ? '.' : ', at the end ' + sayErr(last) + '.');
+      ri++;
+    }
+  }
+  function resetRounds() {
+    recent = [];
+    ri = 0;
+    if (score && song && song.callResponse) { const notes = score.parts[partIdx].notes; while (ri < notes.length && notes[ri].end <= tp.pos) ri++; }
+    roundEl.hidden = !(song && song.callResponse);
+    roundEl.textContent = 'Listen, then sing the note back.'; roundEl.dataset.q = 'idle';
+  }
+
   /* ---------- exercises ---------- */
 
   const exSel = $('exercise'), exLo = $('exLo'), exHi = $('exHi'), exGo = $('exGo'), exNote = $('exNote');
@@ -1166,12 +1205,12 @@
   exHi.addEventListener('change', () => { state.exHi = Number(exHi.value); if (state.exLo > state.exHi) { state.exLo = state.exHi; exLo.value = String(state.exLo); } save(); });
   exGo.addEventListener('click', () => {
     let ex;
-    try { ex = exercises.build(state.exercise, state.exLo, state.exHi); } catch (e) { showMsg('That exercise could not be built.'); return; }
-    const rec = { id: 'exercise', exId: state.exercise, lo: ex.lo, hi: ex.hi, name: ex.name, bytes: ex.bytes.buffer, added: Date.now(), pickup: 0, part: 0, exercise: true };
+    try { ex = exercises.build(state.exercise, state.exLo, state.exHi, Math.floor(Math.random() * 1e9)); } catch (e) { showMsg('That exercise could not be built.'); return; }
+    const rec = { id: 'exercise', exId: state.exercise, lo: ex.lo, hi: ex.hi, name: ex.name, bytes: ex.bytes.buffer, added: Date.now(), pickup: 0, part: ex.partIndex || 0, exercise: true, callResponse: !!ex.callResponse };
     if (!openSong(rec)) return;
     exNote.textContent = ex.widened
       ? 'Your range is narrower than this exercise, so it goes up to ' + noteName(ex.hi) + '.'
-      : 'Starts in the middle of your range, climbs, descends, and comes back. Press Play.';
+      : ex.callResponse ? 'Listen to each note, then sing it from memory. Press Play.' : 'Starts in the middle of your range, climbs, descends, and comes back. Press Play.';
     play();
   });
 

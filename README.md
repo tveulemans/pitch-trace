@@ -19,7 +19,7 @@ Open the score in MuseScore and choose **File, Export, MIDI**. Each voice part b
 
 ### Exercises
 
-Open **Exercises**, choose a warm-up and the lowest and highest note you want, then press **Start exercise**. Five are built in: long notes, a five-note scale, Do-Mi-Sol, leaps from Do, and a major scale. Each starts in the middle of your range, climbs in whole tones, descends, and returns, so every note stays within the limits you set. Loading a song sets the range to your part. The syllables (Do Re Mi) show under the grid, and the speed control slows an exercise down.
+Open **Exercises**, choose a warm-up and the lowest and highest note you want, then press **Start exercise**. Six are built in: long notes, a five-note scale, Do-Mi-Sol, leaps from Do, a major scale, and **Find the note**. In that one the app plays a note, waits a beat, and you sing it back from memory; the notes stay hidden until they start, and after each answer it says where you landed (first try and end of the note, in semitones). It is a different random sequence each time, within your range, and uses headphones so the microphone does not hear the call. Each starts in the middle of your range, climbs in whole tones, descends, and returns, so every note stays within the limits you set. Loading a song sets the range to your part. The syllables (Do Re Mi) show under the grid, and the speed control slows an exercise down.
 
 ### Scores and progress
 

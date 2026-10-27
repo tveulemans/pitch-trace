@@ -18,6 +18,8 @@
       help: 'The notes of a major chord, one after the other. Trains the jump between notes.' },
     { id: 'leaps', name: 'Leaps from Do', bpm: 66, step: 2, notes: [[0, 2], [7, 2], [0, 2], [4, 2], [0, 2], [9, 2], [0, 2], [12, 2], [0, 2]], rest: 2,
       help: 'Come back to Do after each leap. Do stays the same every time, so you hear whether you drifted.' },
+    { id: 'find', name: 'Find the note', bpm: 72, callResponse: true,
+      help: 'The app plays a note. Sing it back after a beat of silence. It tells you where you landed, first try and end of the note. Use headphones.' },
     { id: 'scale', name: 'Major scale', bpm: 80, step: 2, notes: [[0, 1], [2, 1], [4, 1], [5, 1], [7, 1], [9, 1], [11, 1], [12, 1], [11, 1], [9, 1], [7, 1], [5, 1], [4, 1], [2, 1], [0, 2]], rest: 4,
       help: 'A full octave up and down.' },
   ];
@@ -27,7 +29,7 @@
   const meta = (type, data) => [0xff, type, ...vlq(data.length), ...data];
   const ascii = (s) => Array.from(s, (ch) => ch.charCodeAt(0) & 127);
 
-  function spanOf(ex) { return Math.max.apply(null, ex.notes.map((n) => n[0])); }
+  function spanOf(ex) { return ex.notes ? Math.max.apply(null, ex.notes.map((n) => n[0])) : 0; }
 
   /* The starting notes to visit: begin in the middle of the range, go up, then down, then back to the middle. */
   function tonics(lo, hi, span, step) {
@@ -42,10 +44,67 @@
     return order;
   }
 
+  /* Call and response: the app plays a note ("Call"), then you sing it from memory ("Your turn"). Each round is
+     two bars: the call, a beat of silence, the response, then a rest. The notes wander through the range in small
+     steps at first, and later in larger ones. */
+  function rng(seed) {
+    let a = seed >>> 0;
+    return () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  }
+
+  function buildFind(ex, lo, hi, seed) {
+    lo = Math.round(Math.min(lo, hi)); hi = Math.round(Math.max(lo, hi));
+    const rnd = rng(seed == null ? 1 : seed), ROUNDS = 12;
+    const seq = [];
+    let cur = Math.round((lo + hi) / 2);
+    for (let r = 0; r < ROUNDS; r++) {
+      if (r > 0 && hi > lo) {
+        const maxStep = r < 4 ? 3 : 6;
+        let next = cur;
+        for (let tries = 0; tries < 20 && next === cur; tries++) {
+          const step = (1 + Math.floor(rnd() * maxStep)) * (rnd() < 0.5 ? -1 : 1);
+          next = cur + step;
+          if (next < lo || next > hi) next = cur - step;
+          if (next < lo || next > hi) next = cur;
+        }
+        cur = next;
+      }
+      seq.push(cur);
+    }
+    const usPerBeat = Math.round(60e6 / ex.bpm);
+    const track = (name, withTempo, notes) => {
+      const ev = [];
+      if (withTempo) {
+        ev.push([0, meta(0x51, [(usPerBeat >> 16) & 255, (usPerBeat >> 8) & 255, usPerBeat & 255])]);
+        ev.push([0, meta(0x58, [4, 2, 24, 8])]);
+      }
+      ev.push([0, meta(0x03, ascii(name))]);
+      for (const [from, to, midi] of notes) { ev.push([from, [0x90, midi, 80]]); ev.push([to, [0x80, midi, 0]]); }
+      ev.sort((a, b) => a[0] - b[0] || (a[1][0] === 0x80 ? -1 : 0) - (b[1][0] === 0x80 ? -1 : 0));
+      const body = [];
+      let last = 0;
+      for (const [at, bytes] of ev) { body.push(...vlq(at - last), ...bytes); last = at; }
+      body.push(...vlq(ROUNDS * 8 * DIVISION - last), 0xff, 0x2f, 0);
+      return [...ascii('MTrk'), ...u32(body.length), ...body];
+    };
+    const call = [], answer = [];
+    seq.forEach((m, r) => {
+      const b = r * 8 * DIVISION;
+      call.push([b, b + 2 * DIVISION, m]);
+      answer.push([b + 3 * DIVISION, b + 6 * DIVISION, m]);
+    });
+    const bytes = new Uint8Array([
+      ...ascii('MThd'), ...u32(6), 0, 1, 0, 2, DIVISION >> 8, DIVISION & 255,
+      ...track('Call', true, call), ...track('Your turn', false, answer),
+    ]);
+    return { name: ex.name, bytes, widened: false, lo, hi, reps: ROUNDS, callResponse: true, partIndex: 1 };
+  }
+
   /* lo and hi are MIDI note numbers. If the range is narrower than the pattern, the top is raised to fit. */
-  function build(id, lo, hi) {
+  function build(id, lo, hi, seed) {
     const ex = LIST.find((e) => e.id === id);
     if (!ex) throw new Error('Unknown exercise');
+    if (ex.callResponse) return buildFind(ex, lo, hi, seed);
     lo = Math.round(Math.min(lo, hi)); hi = Math.round(Math.max(lo, hi));
     const span = spanOf(ex);
     let widened = false;
