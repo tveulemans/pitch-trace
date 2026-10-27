@@ -294,6 +294,7 @@
     return best;
   }
 
+  let lastAw = 0;
   function analyse() {
     analyser.getFloatTimeDomainData(buf);
     let sum = 0;
@@ -302,6 +303,8 @@
     setLevel(db);
     if (calib) { calib.max = Math.max(calib.max, db); calib.n++; }
     const t = tlNow();
+    const aw = wall(), adt = lastAw ? Math.min(0.1, aw - lastAw) : 0.032;
+    lastAw = aw;
     const rec = !score || (tp.playing && t >= tp.pos0); // not recorded while paused or during the count-in
     // Once a note is sounding, keep listening a little below the threshold so quiet note endings are not cut off.
     const singing = lastVoiced && wall() - lastVoiced.w < 0.3;
@@ -320,7 +323,7 @@
     const hit = score && (rec || !tp.playing) ? targetHit(m, t) : null;
     const e = hit ? hit.e : score ? null : m - Math.round(m);
     lastVoiced = { w, t, m, e };
-    if (run && rec && tp.playing && hit) run.frames.push({ t, e: hit.e, dt: 0.032 * state.speed });
+    if (run && rec && tp.playing && hit) run.frames.push({ t, e: hit.e, dt: adt * state.speed });
     if (rec) {
       pts.push({ t, m, e });
       breakPushed = false;
