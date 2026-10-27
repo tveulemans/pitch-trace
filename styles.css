@@ -120,6 +120,7 @@
   .result p { margin: 0; color: var(--muted); }
   .res-top { display: flex; align-items: baseline; gap: 12px; }
   .res-score { font-family: var(--mono); font-size: 34px; font-weight: 700; color: var(--accent); line-height: 1; }
+  .res-actions { display: flex; gap: 8px; flex-wrap: wrap; }
   .res-detail { color: var(--ink); font-size: 13px; }
   .range-info { margin: 0; font-size: 13px; color: var(--muted); }
   .range-info b { color: var(--ink); font-family: var(--mono); font-weight: 600; }

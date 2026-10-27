@@ -23,9 +23,9 @@
 
   const state = {
     running: false, a4: 440, windowSec: 12, range: 'auto', sens: 50,
-    speed: 1, countIn: true, guideMine: true, guideOthers: true, octave: 'any', partName: '', agc: false, names: 'letters', staff: 'off', lyrics: true, lyricLane: false, exercise: 'five', exLo: 40, exHi: 62,
+    speed: 1, countIn: true, guideMine: true, guideOthers: true, octave: 'any', partName: '', agc: false, names: 'letters', staff: 'off', lyrics: true, lyricLane: false, level: 1, exercise: 'five', exLo: 40, exHi: 62,
   };
-  const PERSIST = ['a4', 'windowSec', 'range', 'sens', 'speed', 'countIn', 'guideMine', 'guideOthers', 'octave', 'partName', 'agc', 'names', 'staff', 'lyrics', 'lyricLane', 'exercise', 'exLo', 'exHi'];
+  const PERSIST = ['a4', 'windowSec', 'range', 'sens', 'speed', 'countIn', 'guideMine', 'guideOthers', 'octave', 'partName', 'agc', 'names', 'staff', 'lyrics', 'lyricLane', 'level', 'exercise', 'exLo', 'exHi'];
   try {
     const saved = JSON.parse(localStorage.getItem('pitchtrace.settings') || '{}');
     for (const k of PERSIST) if (saved[k] != null) state[k] = saved[k];
@@ -37,6 +37,7 @@
   if (state.staff !== 'bass') state.staff = 'off';
   state.lyrics = state.lyrics !== false;
   state.lyricLane = state.lyricLane === true;
+  state.level = Math.min(5, Math.max(1, Math.round(Number(state.level)) || 1));
   state.exLo = Math.min(84, Math.max(28, Math.round(Number(state.exLo)) || 40));
   state.exHi = Math.min(84, Math.max(28, Math.round(Number(state.exHi)) || 62));
   if (state.range === 'score' || !(state.range === 'auto' || RANGES[state.range])) state.range = 'auto';
@@ -261,7 +262,7 @@
     noteEl.textContent = name;
     noteEl.dataset.long = String(name.length >= 4); // longer names get a smaller type size
     centsEl.textContent = sign(cents) + a + ' ¢';
-    verdictEl.textContent = a <= GOOD ? 'In tune' : hit && a >= 70 ? (cents > 0 ? 'Too high' : 'Too low') : cents > 0 ? 'Sharp' : 'Flat';
+    verdictEl.textContent = a <= GOOD ? 'In tune' : hit && a >= 50 ? (cents > 0 ? '\u2193 Too high' : '\u2191 Too low') + ' by ' + (a / 100).toFixed(1) + (a === 100 ? ' semitone' : ' semitones') : cents > 0 ? 'Sharp' : 'Flat';
     hzEl.textContent = (hit ? 'Target ' + noteName(hit.tg) + ' · ' : '') + (state.a4 * Math.pow(2, (m - 69) / 12)).toFixed(1) + ' Hz';
     pinEl.dataset.q = q;
     pinEl.style.left = clamp(50 + cents, 0, 100) + '%';
@@ -323,7 +324,7 @@
     const hit = score && (rec || !tp.playing) ? targetHit(m, t) : null;
     const e = hit ? hit.e : score ? null : m - Math.round(m);
     lastVoiced = { w, t, m, e };
-    if (run && rec && tp.playing && hit) run.frames.push({ t, e: hit.e, dt: adt * state.speed });
+    if (run && rec && tp.playing) run.frames.push({ t, m, dt: adt * state.speed });
     if (rec) {
       pts.push({ t, m, e });
       breakPushed = false;
@@ -936,22 +937,22 @@
 
   /* ---------- scoring and progress ---------- */
 
-  const resultEl = $('result'), scoreBtn = $('scoreRun');
+  const resultEl = $('result'), scoreBtn = $('scoreRun'), levelSel = $('level');
   const progItem = $('progItem'), progMetric = $('progMetric'), progCv = $('progCv'), progInfo = $('progInfo'), progSummary = $('progSummary'), progClear = $('progClear'), progPanel = $('progPanel');
   const HKEY = 'pitchtrace.history';
-  const METRICS = {
-    score: { label: 'In tune (%)', get: (h) => h.score },
-    bias: { label: 'Flat or sharp (cents)', get: (h) => h.bias },
-    wobble: { label: 'Steadiness (cents, lower is better)', get: (h) => h.wobble },
-  };
+  const LEVEL_NAMES = scoring.LEVEL_NAMES;
+  const fmtSemi = (v) => Math.abs(v).toFixed(1) + (Math.abs(v).toFixed(1) === '1.0' ? ' semitone' : ' semitones');
+  // Only runs scored with this version are kept: earlier ones used another scale.
   let history = (() => {
-    try { const a = JSON.parse(lsGet(HKEY) || '[]'); return Array.isArray(a) ? a.filter((h) => h && typeof h.k === 'string' && Number.isFinite(h.score)) : []; } catch (e) { return []; }
+    try { const a = JSON.parse(lsGet(HKEY) || '[]'); return Array.isArray(a) ? a.filter((h) => h && h.v === 2 && typeof h.k === 'string' && Array.isArray(h.levels)) : []; } catch (e) { return []; }
   })();
   let progSel = -1;
+  levelSel.value = String(state.level);
 
   const keyOf = () => (song.exercise ? 'ex:' + song.exId : 'song:' + song.id + '|' + score.parts[partIdx].name);
-  const labelOf = () => (song.exercise ? song.name : song.name.replace(/\.(mid|midi|kar)$/i, '') + (score.parts.length > 1 ? ' · ' + score.parts[partIdx].name : ''));
+  const labelOf = () => (song.exercise ? song.name : song.name.replace(/\.(mid|midi|kar)$/i, '') + (score.parts.length > 1 ? ' \u00b7 ' + score.parts[partIdx].name : ''));
   const entriesFor = (k) => history.filter((h) => h.k === k);
+  const foundAt = (h) => h.levels[state.level - 1];
 
   function refreshScoreBtn() {
     scoreBtn.hidden = !(run && !tp.playing && run.frames.length > 15);
@@ -962,36 +963,68 @@
   function finishRun(until) {
     const r = run; run = null; refreshScoreBtn();
     if (!r || !score) return;
-    const res = scoring.scoreRun(score.parts[r.part].notes, r.frames, { good: GOOD, until: until === Infinity ? Infinity : r.reach });
+    const partial = until !== Infinity;
+    const res = scoring.scoreRun(score.parts[r.part].notes, r.frames, { level: state.level, fold: state.octave === 'any', until: partial ? r.reach : Infinity });
     if (!res) { showMsg('Nothing to score yet: sing through at least one whole note first.'); return; }
-    if (res.sung === 0 && until !== Infinity) { showMsg('No singing was heard during that run, so it was not scored.'); return; }
+    if (res.sung === 0) { showMsg('No singing was heard during that run, so it was not scored.'); return; }
     const key = keyOf();
     const prev = entriesFor(key);
-    history.push({ k: key, label: labelOf(), t: Date.now(), score: res.score, sung: res.sung, bias: res.bias, wobble: res.wobble, notes: res.notes, partial: until !== Infinity, speed: state.speed, lo: song.exercise ? song.lo : score.parts[r.part].lo, hi: song.exercise ? song.hi : score.parts[r.part].hi });
+    history.push({
+      v: 2, k: key, label: labelOf(), t: Date.now(), levels: res.levels, found: res.found, level: state.level, dist: res.dist, bias: res.bias, wobble: res.wobble,
+      sung: res.sung, inTune: res.inTune, notes: res.notes, partial, speed: state.speed,
+      lo: song.exercise ? song.lo : score.parts[r.part].lo, hi: song.exercise ? song.hi : score.parts[r.part].hi,
+    });
     if (history.length > 600) history = history.slice(-600);
     lsSet(HKEY, JSON.stringify(history));
-    showResult(res, prev, until !== Infinity);
+    showResult(res, prev, partial);
     progSel = -1; fillProgItems(key); drawProgress();
   }
 
   function showResult(res, prev, partial) {
-    $('resScore').textContent = res.score + '%';
-    const bias = Math.abs(res.bias) < 3 ? 'centred on the notes' : (res.bias > 0 ? 'sharp' : 'flat') + ' by about ' + Math.round(Math.abs(res.bias)) + ' cents on average';
-    $('resDetail').textContent = 'of the note time within ' + GOOD + ' cents. You sang ' + res.sung + '% of the time, ' + bias + ', and your pitch wobbled by about ±' + Math.round(res.wobble) + ' cents.';
+    $('resScore').textContent = res.found + '%';
+    let d = 'of the notes found within ' + LEVEL_NAMES[state.level - 1] + ' (' + res.foundCount + ' of ' + res.notes + ').';
+    if (res.dist != null) d += ' Typically ' + fmtSemi(res.dist) + ' from the note' + (res.dist < 0.1 ? '.' : res.bias < -0.1 ? ', mostly low.' : res.bias > 0.1 ? ', mostly high.' : '.');
+    $('resDetail').textContent = d;
+    const dir = [];
+    if (res.lowN) dir.push('too low on ' + res.lowN + ' (by ' + fmtSemi(res.lowAvg) + ' on average)');
+    if (res.highN) dir.push('too high on ' + res.highN + ' (by ' + fmtSemi(res.highAvg) + ')');
+    if (res.silentN) dir.push('not sung on ' + res.silentN);
+    $('resDir').textContent = dir.length ? 'Missed notes: ' + dir.join(', ') + '.' : 'Every note you sang was found.';
     const weak = res.weakest.filter((w) => w.pct < 0.7).slice(0, 3);
-    $('resWeak').textContent = weak.length ? 'Weakest notes: ' + weak.map((w) => noteName(w.midi) + ' (' + Math.round(w.pct * 100) + '%)').join(', ') + '.' : 'No weak notes this time.';
+    $('resWeak').textContent = weak.length
+      ? 'Hardest notes: ' + weak.map((w) => noteName(w.midi) + (w.off == null ? ' (not sung)' : ' (' + (w.off < 0 ? 'low' : 'high') + ' by ' + Math.abs(w.off).toFixed(1) + ')')).join(', ') + '.'
+      : 'No hard notes this time.';
     let trend;
     if (!prev.length) trend = 'First scored run of this: it is your starting point.';
     else {
-      const d = res.score - prev[prev.length - 1].score;
-      trend = d === 0 ? 'Same as your last run.' : (d > 0 ? '+' : '−') + Math.abs(d) + ' points compared with your last run.';
+      const last = prev[prev.length - 1];
+      const dd = res.dist != null && last.dist != null ? Math.round((last.dist - res.dist) * 10) / 10 : null;
+      trend = dd == null || dd === 0 ? 'About the same distance as your last run.' : dd > 0 ? 'Closer than your last run by ' + dd.toFixed(1) + ' semitones.' : 'Further than your last run by ' + Math.abs(dd).toFixed(1) + ' semitones.';
     }
-    $('resTrend').textContent = (partial ? 'Partial run, ' + res.notes + ' notes. ' : '') + trend;
+    const upBtn = $('resLevel');
+    upBtn.hidden = !(state.level < 5 && res.found >= 85 && !partial);
+    if (!upBtn.hidden) upBtn.textContent = 'Try ' + LEVEL_NAMES[state.level];
+    $('resTrend').textContent = (partial ? 'Partial run, ' + res.notes + ' notes. ' : '') + trend + (upBtn.hidden ? '' : ' You found at least 85% of the notes, so you may be ready for a tighter level.');
     resultEl.hidden = false;
   }
 
   scoreBtn.addEventListener('click', () => finishRun(0));
   $('resClose').addEventListener('click', hideResult);
+  $('resLevel').addEventListener('click', (ev) => { setScoreLevel(state.level + 1); ev.currentTarget.hidden = true; });
+  levelSel.addEventListener('change', () => setScoreLevel(Number(levelSel.value)));
+  function setScoreLevel(n) {
+    state.level = Math.min(5, Math.max(1, n)); levelSel.value = String(state.level); save();
+    progMetric.options[1].textContent = 'Notes found within ' + LEVEL_NAMES[state.level - 1] + ' (%)';
+    drawProgress();
+  }
+  progMetric.options[1].textContent = 'Notes found within ' + LEVEL_NAMES[state.level - 1] + ' (%)';
+
+  const METRICS = {
+    distance: { get: (h) => h.dist },
+    found: { get: (h) => foundAt(h) },
+    bias: { get: (h) => h.bias },
+    wobble: { get: (h) => h.wobble / 100 },
+  };
 
   /* Progress chart: one point per scored run, with the average of the last five runs as a line. */
   function fillProgItems(want) {
@@ -1008,19 +1041,19 @@
   function fmtStamp(t) { return fmtDate(t) + ' ' + new Date(t).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }); }
 
   function pointColor(metric, v) {
-    if (metric === 'score') return v >= 80 ? col.good : v >= 50 ? col.warn : col.bad;
+    if (metric === 'found') return v >= 80 ? col.good : v >= 50 ? col.warn : col.bad;
     const a = Math.abs(v);
-    return a <= GOOD ? col.good : a <= CLOSE ? col.warn : col.bad;
+    return a <= 0.5 ? col.good : a <= 1.5 ? col.warn : col.bad;
   }
 
   function describe(h) {
-    const b = Math.abs(h.bias) < 3 ? 'centred' : Math.round(Math.abs(h.bias)) + ' cents ' + (h.bias > 0 ? 'sharp' : 'flat');
-    return fmtStamp(h.t) + ' · ' + h.score + '% in tune · ' + b + ' · ±' + Math.round(h.wobble) + ' cents wobble · speed ' + Math.round((h.speed || 1) * 100) + '%' + (h.partial ? ' · partial run' : '');
+    const dir = h.bias < -0.1 ? 'mostly low' : h.bias > 0.1 ? 'mostly high' : 'balanced';
+    return fmtStamp(h.t) + ' · typically ' + (h.dist == null ? 'not sung' : fmtSemi(h.dist) + ' off') + ' (' + dir + ') · ' + foundAt(h) + '% found within ' + LEVEL_NAMES[state.level - 1] + ' · speed ' + Math.round((h.speed || 1) * 100) + '%' + (h.partial ? ' · partial run' : '');
   }
 
   function drawProgress() {
     if (!progPanel.open) return;
-    const list = entriesFor(progItem.value);
+    const list = entriesFor(progItem.value).filter((h) => h.dist != null);
     const r = progCv.getBoundingClientRect();
     const d = window.devicePixelRatio || 1;
     if (!r.width) return;
@@ -1028,28 +1061,31 @@
     const c = progCv.getContext('2d');
     c.setTransform(d, 0, 0, d, 0, 0);
     c.clearRect(0, 0, r.width, r.height);
-    progClear.hidden = !list.length;
+    progClear.hidden = !entriesFor(progItem.value).length;
     if (!list.length) {
       progSummary.textContent = history.length ? '' : 'Finish an exercise or a song from the start to see your first score here.';
       progInfo.textContent = '';
+      progCv.xs = null;
       return;
     }
     const m = progMetric.value, spec = METRICS[m];
     const vals = list.map(spec.get);
-    let lo = 0, hi = 100;
-    if (m === 'bias') { const a = Math.max(30, Math.ceil(Math.max.apply(null, vals.map(Math.abs)) / 10) * 10); lo = -a; hi = a; }
-    if (m === 'wobble') { hi = Math.max(30, Math.ceil(Math.max.apply(null, vals) / 10) * 10); }
+    let lo = 0, hi = 100, unit = '';
+    if (m === 'distance') { hi = Math.max(2, Math.ceil(Math.max.apply(null, vals) / 2) * 2); }
+    if (m === 'bias') { const a = Math.max(2, Math.ceil(Math.max.apply(null, vals.map(Math.abs)) / 2) * 2); lo = -a; hi = a; }
+    if (m === 'wobble') { hi = Math.max(0.4, Math.ceil(Math.max.apply(null, vals) / 0.4) * 0.4); }
     const L = 38, R = 12, T = 10, B = 24, w = r.width - L - R, h = r.height - T - B;
     const y = (v) => T + h - ((v - lo) / (hi - lo)) * h;
     const x = (i) => L + (vals.length < 2 ? w / 2 : (i / (vals.length - 1)) * w);
     c.font = '10px ' + MONO; c.textBaseline = 'middle'; c.textAlign = 'right';
-    const ticks = m === 'bias' ? [lo, lo / 2, 0, hi / 2, hi] : [0, 1, 2, 3, 4].map((k) => lo + ((hi - lo) * k) / 4);
-    if (m === 'bias') { c.fillStyle = col.band; c.fillRect(L, y(GOOD), w, y(-GOOD) - y(GOOD)); }
-    if (m === 'score') { c.fillStyle = col.band; c.fillRect(L, y(100), w, y(80) - y(100)); }
+    const ticks = [0, 1, 2, 3, 4].map((k) => lo + ((hi - lo) * k) / 4);
+    if (m === 'bias') { c.fillStyle = col.band; c.fillRect(L, y(0.5), w, y(-0.5) - y(0.5)); }
+    if (m === 'distance' || m === 'wobble') { c.fillStyle = col.band; c.fillRect(L, y(m === 'wobble' ? 0.15 : 0.5), w, y(0) - y(m === 'wobble' ? 0.15 : 0.5)); }
+    if (m === 'found') { c.fillStyle = col.band; c.fillRect(L, y(100), w, y(80) - y(100)); }
     for (const v of ticks) {
       c.strokeStyle = v === 0 && m === 'bias' ? col.gridStrong : col.grid; c.lineWidth = 1;
       c.beginPath(); c.moveTo(L, y(v)); c.lineTo(L + w, y(v)); c.stroke();
-      c.fillStyle = col.muted; c.fillText(String(Math.round(v)), L - 6, y(v));
+      c.fillStyle = col.muted; c.fillText(m === 'found' ? String(Math.round(v)) : v.toFixed(1), L - 6, y(v));
     }
     c.textAlign = 'left'; c.textBaseline = 'alphabetic';
     c.fillText(fmtDate(list[0].t), L, r.height - 6);
@@ -1065,16 +1101,21 @@
       c.beginPath(); avg.forEach((v, i) => (i ? c.lineTo(x(i), y(v)) : c.moveTo(x(i), y(v)))); c.stroke();
     }
     vals.forEach((v, i) => {
-      c.fillStyle = pointColor(m, v);
+      c.fillStyle = pointColor(m, m === 'wobble' ? v * 100 / 50 : v);
       c.beginPath(); c.arc(x(i), y(v), i === progSel ? 6 : 4, 0, Math.PI * 2); c.fill();
       c.strokeStyle = i === progSel ? col.ink : col.panel; c.lineWidth = 2; c.stroke();
     });
     progCv.xs = vals.map((_, i) => x(i));
-    const s = scoring.summarize(list.map((e) => e.score));
-    let text = s.runs + (s.runs === 1 ? ' run' : ' runs') + ' · best ' + s.best + '% · last ' + s.last + '%';
-    if (s.k >= 2) { const dlt = Math.round(s.last5 - s.first5); text += ' · average of the last ' + s.k + ': ' + Math.round(s.last5) + '% against ' + Math.round(s.first5) + '% for the first ' + s.k + ' (' + (dlt >= 0 ? '+' : '−') + Math.abs(dlt) + ')'; }
+    progCv.list = list;
+    const dist = list.map((e) => e.dist);
+    const s = scoring.summarize(dist, true);
+    let text = entriesFor(progItem.value).length + ' runs';
+    if (s) {
+      text += ' · closest ' + fmtSemi(s.best) + ' · last ' + fmtSemi(s.last) + ' (typical distance from the note)';
+      if (s.k >= 2) { const dlt = s.first5 - s.last5; text += ' · first ' + s.k + ' runs averaged ' + fmtSemi(s.first5) + ', last ' + s.k + ' ' + fmtSemi(s.last5) + (Math.abs(dlt) >= 0.05 ? (dlt > 0 ? ': closer by ' : ': further by ') + Math.abs(dlt).toFixed(1) : ''); }
+    }
     progSummary.textContent = text;
-    progInfo.textContent = progSel >= 0 && list[progSel] ? describe(list[progSel]) : 'Tap a point for the details of that run. The line is the average of your last five runs.';
+    progInfo.textContent = progSel >= 0 && list[progSel] ? describe(list[progSel]) : 'Tap a point for the details of that run. The thick line is the average of your last five runs.';
   }
 
   progCv.addEventListener('click', (ev) => {
@@ -1086,7 +1127,7 @@
     progSel = best; drawProgress();
   });
   progItem.addEventListener('change', () => { progSel = -1; drawProgress(); });
-  progMetric.addEventListener('change', drawProgress);
+  progMetric.addEventListener('change', () => { progSel = -1; drawProgress(); });
   progPanel.addEventListener('toggle', () => { fillProgItems(); drawProgress(); });
   let clearTimer = 0;
   progClear.addEventListener('click', () => {

@@ -23,9 +23,11 @@ Open **Exercises**, choose a warm-up and the lowest and highest note you want, t
 
 ### Scores and progress
 
-Play an exercise or a song from the start to the end and the app scores the run: the share of the note time you spent within 15 cents of the target. Silence and wrong notes count as out of tune; the first moment of each note is forgiven while you settle. The result card also shows how much you sang, whether you tend to be sharp or flat, how steady your pitch is, and your weakest notes. To score a run you stop early, pause and press **Score this run**: only the notes already finished count. Seeking within a run cancels it.
+Play an exercise or a song from the start to the end and the app scores the run. The headline is **notes found**: a note counts as found if you were within the level's tolerance for at least half of it, judged against the note you should be singing at that moment (never a neighbouring one; the first moment of each note is forgiven while you settle). The tolerance is a level you choose under Settings, **Scoring level**: within 2 semitones, within 1 semitone, within 50 cents, within 25 cents, within 15 cents. Start wide; when you find at least 85% of the notes, the result card offers the next level.
 
-Open **Progress** to see every scored run as a chart for one exercise or song: in tune (%), flat or sharp (cents), or steadiness. The line is the average of your last five runs, and tapping a point shows that run. Runs are kept in this browser only, so another device starts with its own history. Runs of an exercise at different ranges or speeds share one chart, which makes small changes harder to read.
+The result card also says how far you typically were from the note, whether you were mostly low or high (and by how much on the missed notes), which notes were hardest, and the change since your last run. To score a run you stop early, pause and press **Score this run**: only the notes already finished count. Seeking within a run cancels it.
+
+Open **Progress** to see every scored run as a chart for one exercise or song: typical distance from the note (semitones, lower is better), notes found (%), too low or too high, or steadiness inside a note. The thick line is the average of your last five runs, and tapping a point shows that run. Each run stores its result at every level, so changing the level afterwards re-reads the older runs. Runs are kept in this browser only. Runs of an exercise at different ranges or speeds share one chart.
 
 ### Lyrics
 

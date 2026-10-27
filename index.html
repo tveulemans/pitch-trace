@@ -52,9 +52,10 @@
 
   <section class="result" id="result" hidden aria-live="polite">
     <div class="res-top"><span class="res-score" id="resScore"></span><span class="res-detail" id="resDetail"></span></div>
+    <p id="resDir"></p>
     <p id="resWeak"></p>
     <p id="resTrend"></p>
-    <button class="btn small" id="resClose" type="button">Close</button>
+    <div class="res-actions"><button class="btn small" id="resLevel" type="button" hidden>Tighter level</button><button class="btn small" id="resClose" type="button">Close</button></div>
   </section>
 
   <section class="transport" id="transport" aria-label="Playback" hidden>
@@ -105,9 +106,10 @@
         <label class="field">Exercise or song <select id="progItem"></select></label>
         <label class="field">Show
           <select id="progMetric">
-            <option value="score">In tune (%)</option>
-            <option value="bias">Flat or sharp (cents)</option>
-            <option value="wobble">Steadiness (cents)</option>
+            <option value="distance">Typical distance from the note (semitones)</option>
+            <option value="found">Notes found (%)</option>
+            <option value="bias">Too low or too high (semitones)</option>
+            <option value="wobble">Steadiness inside a note (semitones)</option>
           </select>
         </label>
         <canvas id="progCv" style="grid-column:1/-1;width:100%;height:190px;display:block;background:var(--panel);border:1px solid var(--grid);border-radius:10px"></canvas>
@@ -158,6 +160,15 @@
         </label>
         <label class="field">Lyrics under the notes
           <input type="checkbox" id="lyricLane">
+        </label>
+        <label class="field">Scoring level
+          <select id="level">
+            <option value="1">1: within 2 semitones</option>
+            <option value="2">2: within 1 semitone</option>
+            <option value="3">3: within 50 cents</option>
+            <option value="4">4: within 25 cents</option>
+            <option value="5">5: within 15 cents</option>
+          </select>
         </label>
         <label class="field">Octave
           <select id="octave">
