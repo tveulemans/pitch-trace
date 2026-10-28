@@ -23,9 +23,9 @@
 
   const state = {
     running: false, a4: 440, windowSec: 12, range: 'auto', sens: 50,
-    speed: 1, countIn: true, guideMine: true, guideOthers: true, octave: 'any', partName: '', agc: false, names: 'letters', staff: 'off', lyrics: true, lyricLane: false, level: 1, exercise: 'five', exLo: 40, exHi: 62,
+    speed: 1, countIn: true, guideMine: true, guideOthers: true, octave: 'any', partName: '', agc: false, names: 'letters', staff: 'off', lyrics: true, lyricLane: false, level: 1, exercise: 'five', exMode: 'guide', exLen: 8, exLo: 40, exHi: 62,
   };
-  const PERSIST = ['a4', 'windowSec', 'range', 'sens', 'speed', 'countIn', 'guideMine', 'guideOthers', 'octave', 'partName', 'agc', 'names', 'staff', 'lyrics', 'lyricLane', 'level', 'exercise', 'exLo', 'exHi'];
+  const PERSIST = ['a4', 'windowSec', 'range', 'sens', 'speed', 'countIn', 'guideMine', 'guideOthers', 'octave', 'partName', 'agc', 'names', 'staff', 'lyrics', 'lyricLane', 'level', 'exercise', 'exMode', 'exLen', 'exLo', 'exHi'];
   try {
     const saved = JSON.parse(localStorage.getItem('pitchtrace.settings') || '{}');
     for (const k of PERSIST) if (saved[k] != null) state[k] = saved[k];
@@ -38,6 +38,12 @@
   state.lyrics = state.lyrics !== false;
   state.lyricLane = state.lyricLane === true;
   state.level = Math.min(5, Math.max(1, Math.round(Number(state.level)) || 1));
+  // The old "Long notes" and "Find the note" exercises are now modes of "Hold the note".
+  if (state.exercise === 'find') { state.exercise = 'hold'; state.exMode = 'memory'; }
+  if (state.exercise === 'long') { state.exercise = 'hold'; state.exMode = 'guide'; }
+  if (state.exMode !== 'memory') state.exMode = 'guide';
+  if (![5, 8, 12].includes(Number(state.exLen))) state.exLen = 8;
+  state.exLen = Number(state.exLen);
   state.exLo = Math.min(84, Math.max(28, Math.round(Number(state.exLo)) || 40));
   state.exHi = Math.min(84, Math.max(28, Math.round(Number(state.exHi)) || 62));
   if (state.range === 'score' || !(state.range === 'auto' || RANGES[state.range])) state.range = 'auto';
@@ -907,7 +913,7 @@
     rangeInfo.textContent = '';
     const b = (t) => { const e = document.createElement('b'); e.textContent = t; return e; };
     rangeInfo.append(p.name + ': lowest ', b(noteName(p.lo)), ', highest ', b(noteName(p.hi)), ' (' + size + ')');
-    if (song && song.exercise) { rangeInfo.append(' \u00b7 ' + exercises.list.find((e) => e.name === song.name).help); lyricWarn.hidden = true; }
+    if (song && song.exercise) { rangeInfo.append(' \u00b7 ' + (song.help || '')); lyricWarn.hidden = true; }
     else {
       const n = lyricNotice();
       if (n.info) rangeInfo.append(' \u00b7 ' + n.info);
@@ -1212,10 +1218,14 @@
 
   /* ---------- exercises ---------- */
 
+  const exModeSel = $('exMode'), exLenSel = $('exLen'), exModeField = $('exModeField'), exLenField = $('exLenField');
   const exSel = $('exercise'), exLo = $('exLo'), exHi = $('exHi'), exGo = $('exGo'), exNote = $('exNote');
   exercises.list.forEach((e) => exSel.add(new Option(e.name, e.id)));
   if (!exercises.list.some((e) => e.id === state.exercise)) state.exercise = exercises.list[0].id;
   exSel.value = state.exercise;
+  exModeSel.value = state.exMode; exLenSel.value = String(state.exLen);
+  const showHoldOptions = () => { const hold = !!exercises.list.find((e) => e.id === state.exercise && e.hold); exModeField.hidden = !hold; exLenField.hidden = !hold; };
+  showHoldOptions();
 
   function fillExRange() {
     for (const [sel, val] of [[exLo, state.exLo], [exHi, state.exHi]]) {
@@ -1227,13 +1237,15 @@
   }
 
   fillExRange();
-  exSel.addEventListener('change', () => { state.exercise = exSel.value; save(); });
+  exSel.addEventListener('change', () => { state.exercise = exSel.value; showHoldOptions(); save(); });
+  exModeSel.addEventListener('change', () => { state.exMode = exModeSel.value; save(); });
+  exLenSel.addEventListener('change', () => { state.exLen = Number(exLenSel.value); save(); });
   exLo.addEventListener('change', () => { state.exLo = Number(exLo.value); if (state.exHi < state.exLo) { state.exHi = state.exLo; exHi.value = String(state.exHi); } save(); });
   exHi.addEventListener('change', () => { state.exHi = Number(exHi.value); if (state.exLo > state.exHi) { state.exLo = state.exHi; exLo.value = String(state.exLo); } save(); });
   exGo.addEventListener('click', () => {
     let ex;
-    try { ex = exercises.build(state.exercise, state.exLo, state.exHi, Math.floor(Math.random() * 1e9)); } catch (e) { showMsg('That exercise could not be built.'); return; }
-    const rec = { id: 'exercise', exId: state.exercise, lo: ex.lo, hi: ex.hi, name: ex.name, bytes: ex.bytes.buffer, added: Date.now(), pickup: 0, part: ex.partIndex || 0, exercise: true, callResponse: !!ex.callResponse };
+    try { ex = exercises.build(state.exercise, state.exLo, state.exHi, Math.floor(Math.random() * 1e9), { mode: state.exMode, seconds: state.exLen }); } catch (e) { showMsg('That exercise could not be built.'); return; }
+    const rec = { id: 'exercise', exId: state.exercise + (state.exercise === 'hold' ? ':' + state.exMode : ''), help: ex.help, lo: ex.lo, hi: ex.hi, name: ex.name, bytes: ex.bytes.buffer, added: Date.now(), pickup: 0, part: ex.partIndex || 0, exercise: true, callResponse: !!ex.callResponse };
     if (!openSong(rec)) return;
     exNote.textContent = ex.widened
       ? 'Your range is narrower than this exercise, so it goes up to ' + noteName(ex.hi) + '.'

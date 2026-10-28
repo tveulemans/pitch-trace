@@ -124,6 +124,19 @@
       <summary>Exercises</summary>
       <div class="grid">
         <label class="field">Exercise <select id="exercise"></select></label>
+        <label class="field" id="exModeField" hidden>How
+          <select id="exMode">
+            <option value="guide">Guide tone plays along</option>
+            <option value="memory">Listen first, sing from memory</option>
+          </select>
+        </label>
+        <label class="field" id="exLenField" hidden>Note length
+          <select id="exLen">
+            <option value="5">5 seconds</option>
+            <option value="8">8 seconds</option>
+            <option value="12">12 seconds</option>
+          </select>
+        </label>
         <label class="field">Lowest note <select id="exLo"></select></label>
         <label class="field">Highest note <select id="exHi"></select></label>
         <div class="field" style="display:grid;gap:6px;justify-items:start">

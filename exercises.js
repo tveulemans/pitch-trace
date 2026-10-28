@@ -10,16 +10,14 @@
   /* notes: [semitones above the starting note, beats]; rest: silent beats before the next repeat.
      Every pattern fills whole 4/4 bars, so the bar numbers stay tidy. */
   const LIST = [
-    { id: 'long', name: 'Long notes', bpm: 60, step: 2, lyric: () => 'Ah', notes: [[0, 6]], rest: 2,
-      help: 'Hold each note steadily for six beats. Watch the line settle on the bar.' },
+    { id: 'hold', name: 'Hold the note', bpm: 60, hold: true,
+      help: 'Notes wander through your range, one at a time. Choose whether the guide tone plays along, or you hear the note first and sing it back from memory.' },
     { id: 'five', name: 'Five-note scale', bpm: 80, step: 2, notes: [[0, 1], [2, 1], [4, 1], [5, 1], [7, 1], [5, 1], [4, 1], [2, 1], [0, 2]], rest: 2,
       help: 'Do Re Mi Fa Sol and back. The classic first warm-up.' },
     { id: 'arp', name: 'Do-Mi-Sol', bpm: 76, step: 2, notes: [[0, 1], [4, 1], [7, 1], [4, 1], [0, 2]], rest: 2,
       help: 'The notes of a major chord, one after the other. Trains the jump between notes.' },
     { id: 'leaps', name: 'Leaps from Do', bpm: 66, step: 2, notes: [[0, 2], [7, 2], [0, 2], [4, 2], [0, 2], [9, 2], [0, 2], [12, 2], [0, 2]], rest: 2,
       help: 'Come back to Do after each leap. Do stays the same every time, so you hear whether you drifted.' },
-    { id: 'find', name: 'Find the note', bpm: 72, callResponse: true,
-      help: 'The app plays a note. Sing it back after a beat of silence. It tells you where you landed, first try and end of the note. Use headphones.' },
     { id: 'scale', name: 'Major scale', bpm: 80, step: 2, notes: [[0, 1], [2, 1], [4, 1], [5, 1], [7, 1], [9, 1], [11, 1], [12, 1], [11, 1], [9, 1], [7, 1], [5, 1], [4, 1], [2, 1], [0, 2]], rest: 4,
       help: 'A full octave up and down.' },
   ];
@@ -44,20 +42,32 @@
     return order;
   }
 
-  /* Call and response: the app plays a note ("Call"), then you sing it from memory ("Your turn"). Each round is
-     two bars: the call, a beat of silence, the response, then a rest. The notes wander through the range in small
-     steps at first, and later in larger ones. */
+  /* Hold the note. The notes wander through the range, in small steps at first and larger ones later. Two ways to do it:
+       guide:  the guide tone plays each note while you sing it (one track, "Exercise");
+       memory: call and response. The app plays a note ("Call"), a beat of silence, then you sing it back ("Your turn")
+               without help, and the app tells you where you landed.
+     opts.seconds is how long each note is held; every round fills whole 4/4 bars. */
   function rng(seed) {
     let a = seed >>> 0;
     return () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
   }
 
-  function buildFind(ex, lo, hi, seed) {
+  const HELP = {
+    guide: 'The guide tone plays each note while you sing it. Hold it steadily and watch the line settle on the bar.',
+    memory: 'The app plays a note. After a beat of silence, sing it back and hold it. It tells you where you landed, first try and end of the note. Use headphones.',
+  };
+
+  function buildHold(ex, lo, hi, seed, opts) {
     lo = Math.round(Math.min(lo, hi)); hi = Math.round(Math.max(lo, hi));
-    const rnd = rng(seed == null ? 1 : seed), ROUNDS = 12;
+    const memory = !!(opts && opts.mode === 'memory');
+    const hold = Math.min(20, Math.max(3, Math.round((opts && opts.seconds) || 8)));      // beats = seconds at 60 bpm
+    const callBeats = memory ? 4 : 0, gap = memory ? 1 : 0, rest = 2;
+    const roundBeats = Math.ceil((callBeats + gap + hold + rest) / 4) * 4;
+    const rounds = Math.min(12, Math.max(6, Math.round(170 / roundBeats)));               // about three minutes
+    const rnd = rng(seed == null ? 1 : seed);
     const seq = [];
     let cur = Math.round((lo + hi) / 2);
-    for (let r = 0; r < ROUNDS; r++) {
+    for (let r = 0; r < rounds; r++) {
       if (r > 0 && hi > lo) {
         const maxStep = r < 4 ? 3 : 6;
         let next = cur;
@@ -72,6 +82,7 @@
       seq.push(cur);
     }
     const usPerBeat = Math.round(60e6 / ex.bpm);
+    const total = rounds * roundBeats * DIVISION;
     const track = (name, withTempo, notes) => {
       const ev = [];
       if (withTempo) {
@@ -79,32 +90,39 @@
         ev.push([0, meta(0x58, [4, 2, 24, 8])]);
       }
       ev.push([0, meta(0x03, ascii(name))]);
-      for (const [from, to, midi] of notes) { ev.push([from, [0x90, midi, 80]]); ev.push([to, [0x80, midi, 0]]); }
+      for (const [from, to, midi, text] of notes) {
+        if (text) ev.push([from, meta(0x05, ascii(text))]);
+        ev.push([from, [0x90, midi, 80]]); ev.push([to, [0x80, midi, 0]]);
+      }
       ev.sort((a, b) => a[0] - b[0] || (a[1][0] === 0x80 ? -1 : 0) - (b[1][0] === 0x80 ? -1 : 0));
       const body = [];
       let last = 0;
       for (const [at, bytes] of ev) { body.push(...vlq(at - last), ...bytes); last = at; }
-      body.push(...vlq(ROUNDS * 8 * DIVISION - last), 0xff, 0x2f, 0);
+      body.push(...vlq(total - last), 0xff, 0x2f, 0);
       return [...ascii('MTrk'), ...u32(body.length), ...body];
     };
+    const head = (n) => [...ascii('MThd'), ...u32(6), 0, 1, 0, n, DIVISION >> 8, DIVISION & 255];
+    const name = ex.name + (memory ? ' (from memory)' : ' (guide tone)');
+    if (!memory) {
+      const notes = seq.map((m, r) => [r * roundBeats * DIVISION, (r * roundBeats + hold) * DIVISION, m, 'Ah']);
+      const bytes = new Uint8Array([...head(1), ...track('Exercise', true, notes)]);
+      return { name, bytes, widened: false, lo, hi, reps: rounds, callResponse: false, partIndex: 0, help: HELP.guide, seconds: hold };
+    }
     const call = [], answer = [];
     seq.forEach((m, r) => {
-      const b = r * 8 * DIVISION;
-      call.push([b, b + 2 * DIVISION, m]);
-      answer.push([b + 3 * DIVISION, b + 6 * DIVISION, m]);
+      const b = r * roundBeats * DIVISION;
+      call.push([b, b + callBeats * DIVISION, m]);
+      answer.push([b + (callBeats + gap) * DIVISION, b + (callBeats + gap + hold) * DIVISION, m]);
     });
-    const bytes = new Uint8Array([
-      ...ascii('MThd'), ...u32(6), 0, 1, 0, 2, DIVISION >> 8, DIVISION & 255,
-      ...track('Call', true, call), ...track('Your turn', false, answer),
-    ]);
-    return { name: ex.name, bytes, widened: false, lo, hi, reps: ROUNDS, callResponse: true, partIndex: 1 };
+    const bytes = new Uint8Array([...head(2), ...track('Call', true, call), ...track('Your turn', false, answer)]);
+    return { name, bytes, widened: false, lo, hi, reps: rounds, callResponse: true, partIndex: 1, help: HELP.memory, seconds: hold };
   }
 
   /* lo and hi are MIDI note numbers. If the range is narrower than the pattern, the top is raised to fit. */
-  function build(id, lo, hi, seed) {
+  function build(id, lo, hi, seed, opts) {
     const ex = LIST.find((e) => e.id === id);
     if (!ex) throw new Error('Unknown exercise');
-    if (ex.callResponse) return buildFind(ex, lo, hi, seed);
+    if (ex.hold) return buildHold(ex, lo, hi, seed, opts);
     lo = Math.round(Math.min(lo, hi)); hi = Math.round(Math.max(lo, hi));
     const span = spanOf(ex);
     let widened = false;
@@ -143,7 +161,7 @@
       ...ascii('MThd'), ...u32(6), 0, 1, 0, 1, DIVISION >> 8, DIVISION & 255,
       ...ascii('MTrk'), ...u32(body.length), ...body,
     ]);
-    return { name: ex.name, bytes, widened, lo, hi, reps: list.length };
+    return { name: ex.name, bytes, widened, lo, hi, reps: list.length, callResponse: false, partIndex: 0, help: ex.help };
   }
 
   const api = { exercises: { list: LIST, build, spanOf } };
