@@ -33,6 +33,8 @@ Open **Progress** to see every scored run as a chart for one exercise or song: t
 
 If the MIDI file contains lyric events, the words scroll under the grid with the notes. MuseScore 4 writes them when you export; older MuseScore versions do not. A file without lyrics simply shows none. If your part's track has no lyrics, the first track that has some is used.
 
+The lyrics' word breaks follow the file: a trailing hyphen means the word goes on, and in files with no hyphens a trailing space marks the end of a word. If the lyrics seem to belong to another voice (less than 80% of them start on a note of your part, or they come from another track), the app says so under the part name and under the lyrics. MuseScore sometimes writes one voice's lyrics into another voice's MIDI file; export the full score to check.
+
 If a word break is wrong (a hyphen between two different words, or a missing one), press **Fix word breaks** under the lyrics. Every syllable then shows a hyphen (joined to the next) or a space; tap one to flip it. The fixes are kept with the song on this device. The spelling of the words itself cannot be edited.
 
 ### Controls
@@ -48,6 +50,7 @@ If a word break is wrong (a hyphen between two different words, or a missing one
 | Show lyrics | Shows the line being sung in large type under the grid, with the current syllable highlighted and the next line dimmed. Lines break after rests and sentence ends. Needs lyrics inside the MIDI file (see below). |
 | Lyrics under the notes | Also draws each syllable under its note, scrolling with the grid. Off by default because syllables get cut off when notes are short. |
 | Octave | "Any octave counts" accepts your note an octave above or below the target. "Exact octave" does not. |
+| Tempo | Sets the song's tempo as a percentage of the file's, from 25% to 400%. Use it when a file lost its tempo marking and plays too slowly or quickly: the note under the field shows the resulting speed. Saved with the song. The Speed control still slows playback further. |
 | Pickup beats | Sets bar 1 after a pickup measure, so bar numbers match your score. MIDI does not store pickups. |
 | Voice range | "Fit to score" frames your part. Other choices frame a voice range, and "Follow me" tracks your voice. |
 | Sensitivity | The level below which the microphone is ignored. Raise it to catch quiet singing, lower it if noise shows up. |

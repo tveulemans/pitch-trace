@@ -63,7 +63,7 @@
   const loadBtn = $('load'), fileIn = $('file'), songField = $('songField'), songSel = $('song');
   const partField = $('partField'), partSel = $('part'), scoreRangeOpt = $('scoreRange');
   const octSel = $('octave'), countInCb = $('countIn'), mineCb = $('guideMine'), othersCb = $('guideOthers');
-  const othersField = $('othersField'), pickupField = $('pickupField'), pickupIn = $('pickup'), removeBtn = $('removeSong');
+  const othersField = $('othersField'), pickupField = $('pickupField'), pickupIn = $('pickup'), tempoField = $('tempoField'), tempoIn = $('tempoPct'), tempoNote = $('tempoNote'), lyricWarn = $('lyricWarn'), removeBtn = $('removeSong');
   const agcCb = $('agc'), calibBtn = $('calibrate'), calibNote = $('calibNote'), rangeInfo = $('rangeInfo'), namesSel = $('names'), staffSel = $('staff'), lyricsCb = $('lyrics'), laneCb = $('lyricLane'), lineEl = $('lyricLine'), fixBtn = $('lyricFix');
   agcCb.checked = !!state.agc;
   namesSel.value = state.names;
@@ -430,7 +430,7 @@
       while (ni < notes.length && notes[ni].start < e.start - 1e-6) { prevEnd = Math.max(prevEnd, notes[ni].end); ni++; }
       const gap = e.start - prevEnd, beat = score.meterAt(e.start).beatSec;
       const prev = cur && cur[cur.length - 1];
-      const brk = !cur || e.newline || (prev && !prev.join && (gap > beat * 1.2 || (/[.!?;:]$/.test(prev.text) && chars >= 12) || chars + e.text.length > 34));
+      const brk = !cur || e.newline || (prev && !prev.join && (gap > beat * 1.2 || e.start - prev.start > beat * 4 || (/[.!?;:]$/.test(prev.text) && chars >= 12) || chars + e.text.length > 34));
       if (brk) { cur = []; out.push(cur); chars = 0; }
       cur.push(e); chars += e.text.length + (e.join ? 0 : 1);
     }
@@ -491,12 +491,34 @@
   });
 
   // Lyrics of the chosen part; if that track has none, use the first track that does (they are timed by their own events).
-  function lyricsOf() {
-    if (!score) return [];
+  function lyricPartIdx() {
+    if (!score) return -1;
     const mine = score.parts[partIdx].lyrics;
-    if (mine && mine.length) return mine;
-    for (const p of score.parts) if (p.lyrics && p.lyrics.length) return p.lyrics;
-    return [];
+    if (mine && mine.length) return partIdx;
+    return score.parts.findIndex((p) => p.lyrics && p.lyrics.length);
+  }
+  function lyricsOf() {
+    const i = lyricPartIdx();
+    return i < 0 ? [] : score.parts[i].lyrics;
+  }
+
+  /* Do the lyrics belong to this part? Share of lyric events that start within 60 ms of one of its notes. */
+  function lyricFit() {
+    const ly = lyricsOf(), notes = score.parts[partIdx].notes;
+    let ok = 0, j = 0;
+    for (const e of ly) {
+      while (j < notes.length && notes[j].start < e.start - 0.06) j++;
+      if (j < notes.length && notes[j].start <= e.start + 0.06) ok++;
+    }
+    return { n: ly.length, pct: ly.length ? ok / ly.length : 1 };
+  }
+  function lyricNotice() {
+    const i = lyricPartIdx();
+    if (i < 0) return { info: '', warn: '' };
+    const fit = lyricFit();
+    const from = i !== partIdx ? 'the lyrics come from the track "' + score.parts[i].name + '". ' : '';
+    const off = fit.n >= 8 && fit.pct < 0.8 ? 'only ' + Math.round(fit.pct * 100) + '% of the lyrics start on a note of this part, so they may belong to another voice.' : '';
+    return { info: from || off ? (from + off).trim() : 'lyrics found', warn: from || off ? ('Check the lyrics: ' + from + off).trim() : '' };
   }
 
   function drawLyrics(c, L, pw, T, ph, now, xOf, tL, tR, laneH) {
@@ -885,8 +907,12 @@
     rangeInfo.textContent = '';
     const b = (t) => { const e = document.createElement('b'); e.textContent = t; return e; };
     rangeInfo.append(p.name + ': lowest ', b(noteName(p.lo)), ', highest ', b(noteName(p.hi)), ' (' + size + ')');
-    if (song && song.exercise) rangeInfo.append(' \u00b7 ' + exercises.list.find((e) => e.name === song.name).help);
-    else if (lyricsOf().length) rangeInfo.append(' \u00b7 lyrics found');
+    if (song && song.exercise) { rangeInfo.append(' \u00b7 ' + exercises.list.find((e) => e.name === song.name).help); lyricWarn.hidden = true; }
+    else {
+      const n = lyricNotice();
+      if (n.info) rangeInfo.append(' \u00b7 ' + n.info);
+      lyricWarn.textContent = n.warn; lyricWarn.hidden = !n.warn;
+    }
     if (song && !song.exercise) { state.exLo = clamp(p.lo, 28, 84); state.exHi = clamp(p.hi, 28, 84); save(); fillExRange(); }
   }
 
@@ -899,7 +925,7 @@
 
   function openSong(rec) {
     let sc;
-    try { sc = loadMidi(rec.bytes, rec.name); } catch (e) { showMsg((e && e.message) || 'That file could not be read.'); return false; }
+    try { sc = loadMidi(rec.bytes, rec.name, { tempoScale: 100 / (rec.tempoPct || 100) }); } catch (e) { showMsg((e && e.message) || 'That file could not be read.'); return false; }
     showMsg('');
     pause();
     run = null; hideResult();
@@ -919,6 +945,7 @@
     pts.length = 0; med.length = 0; lastVoiced = null; breakPushed = true;
     seekEl.max = String(sc.durationSec);
     pickupIn.value = String(rec.pickup || 0);
+    tempoField.hidden = !!rec.exercise; tempoIn.value = String(rec.tempoPct || 100); updateTempoNote();
     transportEl.hidden = false; pickupField.hidden = !!rec.exercise; removeBtn.hidden = !!rec.exercise;
     scoreRangeOpt.disabled = false; scoreRangeOpt.hidden = false;
     state.range = 'score'; rangeSel.value = 'score';
@@ -932,7 +959,7 @@
   function closeSong() {
     pause();
     score = null; song = null; bars = []; queue = []; flats = false;
-    transportEl.hidden = true; partField.hidden = true; othersField.hidden = true; pickupField.hidden = true; removeBtn.hidden = true;
+    transportEl.hidden = true; partField.hidden = true; othersField.hidden = true; pickupField.hidden = true; tempoField.hidden = true; removeBtn.hidden = true;
     scoreRangeOpt.disabled = true; scoreRangeOpt.hidden = true;
     if (state.range === 'score') { state.range = 'auto'; rangeSel.value = 'auto'; }
     pts.length = 0; med.length = 0; lastVoiced = null; breakPushed = true;
@@ -1281,6 +1308,19 @@
     if (tp.playing) rebase(tlNow());
     pts.length = 0; breakPushed = true;
     persistSong(song); save(); snapView(); draw();
+  });
+
+  function updateTempoNote() {
+    if (!score || !song || song.exercise) return;
+    const pct = song.tempoPct || 100, now = score.bpmAt(0);
+    tempoNote.textContent = 'Now ' + Math.round(now) + ' quarter notes per minute' + (pct === 100 ? ' (as in the file).' : ', the file says ' + Math.round((now * 100) / pct) + '.');
+  }
+  tempoIn.addEventListener('change', () => {
+    if (!song || song.exercise) return;
+    song.tempoPct = Math.round(clamp(Number(tempoIn.value) || 100, 25, 400));
+    tempoIn.value = String(song.tempoPct);
+    persistSong(song);
+    openSong(song);
   });
 
   pickupIn.addEventListener('change', () => {

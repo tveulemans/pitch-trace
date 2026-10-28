@@ -134,4 +134,34 @@ assert.throws(() => loadMidi(smf(2, 480, [track([])]), 'x'), /format 2/);
   assert.equal(none.parts[0].lyrics.length, 0);
 }
 
+/* Space convention (MuseScore 4): a trailing space ends a word, no space means the word goes on. */
+{
+  const ly = (s) => meta(0x05, Array.from(Buffer.from(s, 'utf8')));
+  const tr = track([
+    [0, tempo(120)],
+    [0, ly('Chil')], [0, [0x90, 60, 80]], [480, [0x80, 60, 0]],
+    [0, ly('dren ')], [0, [0x90, 62, 80]], [480, [0x80, 62, 0]],
+    [0, ly('du ')], [0, [0x90, 64, 80]], [480, [0x80, 64, 0]],
+  ]);
+  const L = loadMidi(smf(1, 480, [tr]), 'sp.mid').parts[0].lyrics;
+  assert.deepEqual(L.map((e) => e.text), ['Chil', 'dren', 'du']);
+  assert.deepEqual(L.map((e) => e.join), [true, false, false]);
+  // Events with neither hyphens nor spaces are one word each.
+  const tr2 = track([[0, tempo(120)], [0, ly('la')], [0, [0x90, 60, 80]], [480, [0x80, 60, 0]], [0, ly('la')], [0, [0x90, 62, 80]], [480, [0x80, 62, 0]]]);
+  assert.deepEqual(loadMidi(smf(1, 480, [tr2]), 'w.mid').parts[0].lyrics.map((e) => e.join), [false, false]);
+}
+
+/* A tempo override scales every time: 0.5 plays twice as fast, notes and lyrics together. */
+{
+  const ly = (s) => meta(0x05, Array.from(Buffer.from(s, 'utf8')));
+  const tr = track([[0, tempo(60)], [0, ly('a')], [0, [0x90, 60, 80]], [480, [0x80, 60, 0]], [480, ly('b')], [0, [0x90, 62, 80]], [480, [0x80, 62, 0]]]);
+  const bytes = smf(1, 480, [tr]);
+  const a = loadMidi(bytes, 'x.mid'), b = loadMidi(bytes, 'x.mid', { tempoScale: 0.5 });
+  assert.ok(Math.abs(a.parts[0].notes[1].start - 2) < 1e-6);
+  assert.ok(Math.abs(b.parts[0].notes[1].start - 1) < 1e-6);
+  assert.ok(Math.abs(b.parts[0].lyrics[1].start - 1) < 1e-6);
+  assert.ok(Math.abs(b.durationSec * 2 - a.durationSec) < 1e-6);
+  assert.ok(Math.abs(b.bpmAt(0) - 120) < 1e-6);
+}
+
 console.log('midi tests passed');

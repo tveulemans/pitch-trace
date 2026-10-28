@@ -117,13 +117,13 @@
 
   /* ---------- timing ---------- */
 
-  function tempoMap(tempos, division) {
+  function tempoMap(tempos, division, scale) {
     const list = tempos.slice().sort((a, b) => a.tick - b.tick);
     if (!list.length || list[0].tick > 0) list.unshift({ tick: 0, us: 500000 });
     const segs = [];
     for (const e of list) {
       const last = segs[segs.length - 1];
-      const spt = e.us / 1e6 / division;
+      const spt = (e.us * scale) / 1e6 / division;
       if (last && e.tick === last.tick) { last.spt = spt; continue; }
       segs.push({ tick: e.tick, sec: last ? last.sec + (e.tick - last.tick) * last.spt : 0, spt });
     }
@@ -152,10 +152,17 @@
 
   /* ---------- lyrics ---------- */
 
-  /* Lyric events carry one syllable each. Writers differ in how they mark word breaks, so accept the usual
-     conventions: a trailing hyphen means the word continues, "/" or "\" starts a new line (karaoke files),
-     lone "-" or "_" placeholders are skipped. Extra verses stored at the same tick are ignored. */
+  /* Lyric events carry one syllable each. Writers differ in how they mark word breaks:
+       - a trailing hyphen means the word continues (most files);
+       - otherwise a trailing space means the word ends and no space means it continues (MuseScore 4 style);
+       - with neither, every event is a word of its own.
+     "/" or "\\" starts a new line (karaoke files), lone "-" or "_" placeholders are skipped, and extra verses stored at
+     the same tick are ignored. The convention is decided per file, from all of its events. */
   function buildLyrics(events, tm) {
+    const usable = events.map((ev) => ev.text.replace(/\0/g, '')).filter((t) => t.trim() && t.trim() !== '-' && t.trim() !== '_');
+    const hyphens = usable.filter((t) => /-\s*$/.test(t) && t.trim().length > 1).length;
+    const spaces = usable.filter((t) => /\s$/.test(t)).length;
+    const mode = hyphens > 0 ? 'hyphen' : spaces > 0 ? 'space' : 'word';
     const out = [];
     let lastTick = -1, newline = false;
     for (const ev of events) {
@@ -164,8 +171,9 @@
       const core = t.trim();
       if (!core || core === '-' || core === '_') continue;
       if (ev.tick === lastTick) continue;
-      const join = core.endsWith('-');
-      out.push({ start: tm.tickToSec(ev.tick), text: join ? core.slice(0, -1) : core, join, newline });
+      const hy = core.length > 1 && core.endsWith('-');
+      const join = mode === 'hyphen' ? hy : mode === 'space' ? !/\s$/.test(t) && !/[,.;:!?]$/.test(core) : false;
+      out.push({ start: tm.tickToSec(ev.tick), text: hy ? core.slice(0, -1) : core, join, newline });
       newline = false;
       lastTick = ev.tick;
     }
@@ -174,10 +182,11 @@
 
   /* ---------- score ---------- */
 
-  function loadMidi(input, fileName) {
+  function loadMidi(input, fileName, opts) {
     const m = parseSmf(input);
     const { division } = m;
-    const tm = tempoMap(m.tempos, division);
+    const tempoScale = opts && opts.tempoScale > 0 ? opts.tempoScale : 1; // 0.5 plays twice as fast
+    const tm = tempoMap(m.tempos, division, tempoScale);
 
     // Meters sorted by tick, later event wins at the same tick, 4/4 assumed from the start.
     const meters = [];

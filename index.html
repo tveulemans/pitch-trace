@@ -48,7 +48,7 @@
     <div class="empty" id="empty"><p>Press Start and sing a note. Your pitch scrolls left; the right edge is now. To practise a part, load a MIDI file.</p></div>
   </div>
 
-  <div class="lyric-line" id="lyricLine" hidden aria-label="Lyrics"><div class="cur"></div><div class="nxt"></div><button class="fix" id="lyricFix" type="button" aria-pressed="false" hidden>Fix word breaks</button></div>
+  <div class="lyric-line" id="lyricLine" hidden aria-label="Lyrics"><div class="cur"></div><div class="nxt"></div><div class="lyric-warn" id="lyricWarn" hidden></div><button class="fix" id="lyricFix" type="button" aria-pressed="false" hidden>Fix word breaks</button></div>
 
   <p class="round" id="roundMsg" data-q="idle" hidden aria-live="polite"></p>
 
@@ -178,6 +178,10 @@
             <option value="exact">Exact octave</option>
           </select>
         </label>
+        <div class="field" id="tempoField" hidden style="display:grid;gap:4px">
+          <label class="field">Tempo <input type="number" id="tempoPct" min="25" max="400" step="5" value="100" inputmode="numeric" style="width:5.5em"> % of the file</label>
+          <span id="tempoNote"></span>
+        </div>
         <label class="field" id="pickupField" hidden>Pickup beats
           <input type="number" id="pickup" min="0" max="16" step="0.5" value="0" inputmode="decimal" style="width:5em">
         </label>
