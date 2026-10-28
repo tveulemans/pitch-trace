@@ -10,16 +10,18 @@
   /* notes: [semitones above the starting note, beats]; rest: silent beats before the next repeat.
      Every pattern fills whole 4/4 bars, so the bar numbers stay tidy. */
   const LIST = [
-    { id: 'hold', name: 'Hold the note', bpm: 60, hold: true,
+    { id: 'single', name: 'Single note', bpm: 60, hold: true,
       help: 'Notes wander through your range, one at a time. Choose whether the guide tone plays along, or you hear the note first and sing it back from memory.' },
-    { id: 'five', name: 'Five-note scale', bpm: 80, step: 2, notes: [[0, 1], [2, 1], [4, 1], [5, 1], [7, 1], [5, 1], [4, 1], [2, 1], [0, 2]], rest: 2,
-      help: 'Do Re Mi Fa Sol and back. The classic first warm-up.' },
-    { id: 'arp', name: 'Do-Mi-Sol', bpm: 76, step: 2, notes: [[0, 1], [4, 1], [7, 1], [4, 1], [0, 2]], rest: 2,
-      help: 'The notes of a major chord, one after the other. Trains the jump between notes.' },
-    { id: 'leaps', name: 'Leaps from Do', bpm: 66, step: 2, notes: [[0, 2], [7, 2], [0, 2], [4, 2], [0, 2], [9, 2], [0, 2], [12, 2], [0, 2]], rest: 2,
-      help: 'Come back to Do after each leap. Do stays the same every time, so you hear whether you drifted.' },
-    { id: 'scale', name: 'Major scale', bpm: 80, step: 2, notes: [[0, 1], [2, 1], [4, 1], [5, 1], [7, 1], [9, 1], [11, 1], [12, 1], [11, 1], [9, 1], [7, 1], [5, 1], [4, 1], [2, 1], [0, 2]], rest: 4,
-      help: 'A full octave up and down.' },
+    { id: 'scales', name: 'Scales', variants: [
+      { id: 'five', label: 'five notes', bpm: 80, step: 2, notes: [[0, 1], [2, 1], [4, 1], [5, 1], [7, 1], [5, 1], [4, 1], [2, 1], [0, 2]], rest: 2,
+        help: 'Do Re Mi Fa Sol and back. The classic first warm-up.' },
+      { id: 'scale', label: 'full octave', bpm: 80, step: 2, notes: [[0, 1], [2, 1], [4, 1], [5, 1], [7, 1], [9, 1], [11, 1], [12, 1], [11, 1], [9, 1], [7, 1], [5, 1], [4, 1], [2, 1], [0, 2]], rest: 4,
+        help: 'A full octave up and down.' } ] },
+    { id: 'intervals', name: 'Intervals', variants: [
+      { id: 'arp', label: 'chord notes', bpm: 76, step: 2, notes: [[0, 1], [4, 1], [7, 1], [4, 1], [0, 2]], rest: 2,
+        help: 'Do-Mi-Sol, the notes of a major chord one after the other. Trains the jump between notes.' },
+      { id: 'leaps', label: 'leaps back to Do', bpm: 66, step: 2, notes: [[0, 2], [7, 2], [0, 2], [4, 2], [0, 2], [9, 2], [0, 2], [12, 2], [0, 2]], rest: 2,
+        help: 'Come back to Do after each leap. Do stays the same every time, so you hear whether you drifted.' } ] },
   ];
 
   const vlq = (n) => { const b = [n & 127]; n >>= 7; while (n) { b.unshift((n & 127) | 128); n >>= 7; } return b; };
@@ -27,7 +29,10 @@
   const meta = (type, data) => [0xff, type, ...vlq(data.length), ...data];
   const ascii = (s) => Array.from(s, (ch) => ch.charCodeAt(0) & 127);
 
-  function spanOf(ex) { return ex.notes ? Math.max.apply(null, ex.notes.map((n) => n[0])) : 0; }
+  function spanOf(ex) {
+    if (ex.variants) return Math.max.apply(null, ex.variants.map(spanOf));
+    return ex.notes ? Math.max.apply(null, ex.notes.map((n) => n[0])) : 0;
+  }
 
   /* The starting notes to visit: begin in the middle of the range, go up, then down, then back to the middle. */
   function tonics(lo, hi, span, step) {
@@ -120,9 +125,13 @@
 
   /* lo and hi are MIDI note numbers. If the range is narrower than the pattern, the top is raised to fit. */
   function build(id, lo, hi, seed, opts) {
-    const ex = LIST.find((e) => e.id === id);
+    let ex = LIST.find((e) => e.id === id);
     if (!ex) throw new Error('Unknown exercise');
     if (ex.hold) return buildHold(ex, lo, hi, seed, opts);
+    if (ex.variants) {
+      const v = ex.variants.find((x) => x.id === (opts && opts.variant)) || ex.variants[0];
+      ex = Object.assign({}, ex, v, { variants: null, name: ex.name + ' (' + v.label + ')', variantId: v.id });
+    }
     lo = Math.round(Math.min(lo, hi)); hi = Math.round(Math.max(lo, hi));
     const span = spanOf(ex);
     let widened = false;
@@ -161,7 +170,7 @@
       ...ascii('MThd'), ...u32(6), 0, 1, 0, 1, DIVISION >> 8, DIVISION & 255,
       ...ascii('MTrk'), ...u32(body.length), ...body,
     ]);
-    return { name: ex.name, bytes, widened, lo, hi, reps: list.length, callResponse: false, partIndex: 0, help: ex.help };
+    return { name: ex.name, variantId: ex.variantId, bytes, widened, lo, hi, reps: list.length, callResponse: false, partIndex: 0, help: ex.help };
   }
 
   const api = { exercises: { list: LIST, build, spanOf } };
