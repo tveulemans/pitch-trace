@@ -487,7 +487,7 @@
      The fixes are kept with the song, keyed by the syllable's position in its track. */
   fixBtn.addEventListener('click', () => {
     fixing = !fixing;
-    fixBtn.textContent = fixing ? 'Done' : 'Fix word breaks';
+    fixBtn.textContent = fixing ? 'Done' : 'Fix lyrics';
     fixBtn.setAttribute('aria-pressed', String(fixing));
     spelling = false; showSpellBtn();
     if (fixing && tp.playing) pause();
@@ -974,7 +974,7 @@
     showMsg('');
     pause();
     run = null; hideResult();
-    linesFor = null; fixing = false; spelling = false; fixBtn.textContent = 'Fix word breaks'; showSpellBtn();
+    linesFor = null; fixing = false; spelling = false; fixBtn.textContent = 'Fix lyrics'; showSpellBtn();
     sc.parts.forEach((p, pi) => p.lyrics.forEach((e, i) => {
       e.key = pi + ':' + i; e.orig = e.join;
       if (rec.fixes && e.key in rec.fixes) e.join = !!rec.fixes[e.key];

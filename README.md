@@ -35,7 +35,7 @@ If the MIDI file contains lyric events, the words scroll under the grid with the
 
 The lyrics' word breaks follow the file: a trailing hyphen means the word goes on, and in files with no hyphens a trailing space marks the end of a word. If the lyrics seem to belong to another voice (less than 80% of them start on a note of your part, or they come from another track), the app says so under the part name and under the lyrics. MuseScore sometimes writes one voice's lyrics into another voice's MIDI file; export the full score to check.
 
-If a word break is wrong (a hyphen between two different words, or a missing one), press **Fix word breaks** under the lyrics. Every syllable then shows a hyphen (joined to the next) or a space; tap one to flip it. To correct a spelling, press **Switch to spelling**, tap the syllable, type the right text and press Enter (Escape cancels). Both kinds of fix are kept with the song on this device.
+If a word break is wrong (a hyphen between two different words, or a missing one), press **Fix lyrics** under the lyrics. Every syllable then shows a hyphen (joined to the next) or a space; tap one to flip it. To correct a spelling, press **Switch to spelling**, tap the syllable, type the right text and press Enter (Escape cancels). Both kinds of fix are kept with the song on this device.
 
 ### Controls
 
