@@ -428,7 +428,7 @@
   /* The line being sung, in large type above the controls: the current syllable is highlighted, the next line is dimmed.
      MIDI has no line breaks, so a new line starts after a rest, after a "/" marker, after sentence punctuation, or when the line gets long. */
   let run = null;
-  let linesFor = null, lines = [], lineIdx = -2, sylIdx = -2, lineSpans = [], lineData = [], fixing = false;
+  let linesFor = null, lines = [], lineIdx = -2, sylIdx = -2, lineSpans = [], lineData = [], lineEnds = [], sylOn = false, fixing = false;
 
   function buildLines(ly) {
     const notes = score.parts[partIdx].notes;
@@ -459,9 +459,15 @@
     for (let k = 0; k < L.length; k++) { if (L[k].start <= now) si = k; else break; }
     if (li !== lineIdx) {
       lineIdx = li; sylIdx = -2;
-      const curEl = lineEl.firstElementChild, nxtEl = lineEl.lastElementChild;
+      const curEl = lineEl.querySelector('.cur'), nxtEl = lineEl.querySelector('.nxt');
       curEl.textContent = ''; lineSpans = [];
-      lineData = L;
+      lineData = L; sylOn = false;
+      // When each syllable stops sounding: the end of the note it sits on, or the next syllable if there is no note.
+      const pn = score.parts[partIdx].notes;
+      lineEnds = L.map((e, k) => {
+        const n = pn.find((x) => Math.abs(x.start - e.start) < 0.06);
+        return n ? n.end : (L[k + 1] ? L[k + 1].start : e.start + 0.5);
+      });
       curEl.classList.toggle('fixing', fixing);
       L.forEach((e) => {
         const sp = document.createElement('span');
@@ -470,9 +476,10 @@
       });
       nxtEl.textContent = lines[li + 1] ? lines[li + 1].map((e) => e.text + (e.join ? '' : ' ')).join('') : '';
     }
-    if (si !== sylIdx) {
-      sylIdx = si;
-      lineSpans.forEach((sp, k) => { sp.className = k < si ? 'past' : k === si ? 'now' : ''; });
+    const on = si >= 0 && now < lineEnds[si];     // the highlight goes out as soon as the note ends
+    if (si !== sylIdx || on !== sylOn) {
+      sylIdx = si; sylOn = on;
+      lineSpans.forEach((sp, k) => { sp.className = k < si || (k === si && !on) ? 'past' : k === si ? 'now' : ''; });
     }
   }
 
