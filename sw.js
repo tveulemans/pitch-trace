@@ -1,7 +1,7 @@
 /* Service worker for Pitch Trace.
  * Network first, so a new deploy shows up on the next load; the cache is the
  * offline fallback. Bump CACHE only if you rename or remove files. */
-const CACHE = 'pitch-trace-v7';
+const CACHE = 'pitch-trace-v8';
 const CORE = [
   './',
   'index.html',

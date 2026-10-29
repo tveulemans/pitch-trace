@@ -72,7 +72,7 @@
   const partField = $('partField'), partSel = $('part'), scoreRangeOpt = $('scoreRange');
   const octSel = $('octave'), countInCb = $('countIn'), mineCb = $('guideMine'), othersCb = $('guideOthers');
   const othersField = $('othersField'), pickupField = $('pickupField'), pickupIn = $('pickup'), tempoField = $('tempoField'), tempoIn = $('tempoPct'), tempoNote = $('tempoNote'), lyricWarn = $('lyricWarn'), removeBtn = $('removeSong');
-  const agcCb = $('agc'), calibBtn = $('calibrate'), calibNote = $('calibNote'), rangeInfo = $('rangeInfo'), namesSel = $('names'), staffSel = $('staff'), lyricsCb = $('lyrics'), laneCb = $('lyricLane'), lineEl = $('lyricLine'), fixBtn = $('lyricFix');
+  const agcCb = $('agc'), calibBtn = $('calibrate'), calibNote = $('calibNote'), rangeInfo = $('rangeInfo'), namesSel = $('names'), staffSel = $('staff'), lyricsCb = $('lyrics'), laneCb = $('lyricLane'), lineEl = $('lyricLine'), fixBtn = $('lyricFix'), spellBtn = $('lyricSpell');
   agcCb.checked = !!state.agc;
   namesSel.value = state.names;
   staffSel.value = state.staff;
@@ -428,7 +428,7 @@
   /* The line being sung, in large type above the controls: the current syllable is highlighted, the next line is dimmed.
      MIDI has no line breaks, so a new line starts after a rest, after a "/" marker, after sentence punctuation, or when the line gets long. */
   let run = null;
-  let linesFor = null, lines = [], lineIdx = -2, sylIdx = -2, lineSpans = [], lineData = [], lineEnds = [], sylOn = false, fixing = false;
+  let linesFor = null, lines = [], lineIdx = -2, sylIdx = -2, lineSpans = [], lineData = [], lineEnds = [], sylOn = false, fixing = false, spelling = false;
 
   function buildLines(ly) {
     const notes = score.parts[partIdx].notes;
@@ -489,15 +489,45 @@
     fixing = !fixing;
     fixBtn.textContent = fixing ? 'Done' : 'Fix word breaks';
     fixBtn.setAttribute('aria-pressed', String(fixing));
+    spelling = false; showSpellBtn();
     if (fixing && tp.playing) pause();
     lineIdx = -2; draw();
   });
+  function showSpellBtn() {
+    spellBtn.hidden = !fixing;
+    spellBtn.textContent = spelling ? 'Switch to word breaks' : 'Switch to spelling';
+    lineEl.querySelector('.cur').classList.toggle('spelling', fixing && spelling);
+  }
+  spellBtn.addEventListener('click', () => { spelling = !spelling; showSpellBtn(); });
+  // Spelling: tap a syllable, type the right text, press Enter (or tap away). Kept with the song like the word breaks.
+  function editSpelling(sp, e) {
+    const inp = document.createElement('input');
+    inp.type = 'text'; inp.value = e.text; inp.className = 'spell-input'; inp.size = Math.max(3, e.text.length + 1);
+    inp.setAttribute('aria-label', 'Correct this syllable');
+    sp.textContent = ''; sp.append(inp); inp.focus(); inp.select();
+    let done = false;
+    const commit = (keep) => {
+      if (done) return; done = true;
+      const v = inp.value.trim();
+      if (keep && v && v !== e.text) {
+        e.text = v;
+        song.spell = song.spell || {};
+        if (v === e.origText) delete song.spell[e.key]; else song.spell[e.key] = v;
+        persistSong(song);
+      }
+      linesFor = null; draw();
+    };
+    inp.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') commit(true); else if (ev.key === 'Escape') commit(false); });
+    inp.addEventListener('blur', () => commit(true));
+  }
   lineEl.firstElementChild.addEventListener('click', (ev) => {
     if (!fixing || !song) return;
+    if (ev.target.closest('input')) return;
     const sp = ev.target.closest('span');
     const k = sp ? lineSpans.indexOf(sp) : -1;
     if (k < 0) return;
     const e = lineData[k];
+    if (spelling) { editSpelling(sp, e); return; }
     e.join = !e.join;
     song.fixes = song.fixes || {};
     if (e.join === e.orig) delete song.fixes[e.key]; else song.fixes[e.key] = e.join;
@@ -944,10 +974,12 @@
     showMsg('');
     pause();
     run = null; hideResult();
-    linesFor = null; fixing = false; fixBtn.textContent = 'Fix word breaks';
+    linesFor = null; fixing = false; spelling = false; fixBtn.textContent = 'Fix word breaks'; showSpellBtn();
     sc.parts.forEach((p, pi) => p.lyrics.forEach((e, i) => {
       e.key = pi + ':' + i; e.orig = e.join;
       if (rec.fixes && e.key in rec.fixes) e.join = !!rec.fixes[e.key];
+      e.origText = e.text;
+      if (rec.spell && e.key in rec.spell) e.text = String(rec.spell[e.key]);
     }));
     score = sc; song = rec; flats = rec.exercise ? true : sc.flats;
     let idx = rec.part != null && rec.part < sc.parts.length ? rec.part : -1;

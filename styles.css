@@ -146,3 +146,6 @@
   .msg { margin: 0; padding: 10px 12px; border-radius: 8px; background: color-mix(in srgb, var(--bad) 14%, var(--panel)); border: 1px solid color-mix(in srgb, var(--bad) 45%, transparent); font-size: 14px; }
   [hidden] { display: none !important; }
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+  .lyric-line .cur.spelling span { border-bottom: 1px solid var(--accent); }
+  .lyric-line .spell-input { font: inherit; color: var(--ink); background: var(--surface, transparent); border: 1px solid var(--accent); border-radius: 4px; padding: 0 2px; width: auto; min-width: 3ch; }
