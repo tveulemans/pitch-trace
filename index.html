@@ -82,6 +82,10 @@
   <p class="msg" id="msg" role="alert" hidden></p>
 
   <div class="controls">
+    <div class="modes" role="group" aria-label="Practise">
+      <button class="btn" id="modeSongs" type="button" aria-pressed="true">Songs</button>
+      <button class="btn" id="modeEx" type="button" aria-pressed="false">Exercises</button>
+    </div>
     <button class="go" id="toggle" type="button" data-on="false">Start</button>
     <button class="btn" id="load" type="button">Load MIDI</button>
     <input type="file" id="file" accept=".mid,.midi,.kar,audio/midi,audio/x-midi" hidden>
@@ -144,7 +148,7 @@
           <button class="btn primary" id="exGo" type="button">Start exercise</button>
           <span id="exNote" aria-live="polite"></span>
         </div>
-        <p class="help">Simple warm-ups made for your range: each one is repeated higher and lower, so the notes stay within the lowest and highest note you set. Loading a song sets the range to your part. Each exercise has the syllables under the grid.</p>
+        <p class="help">Simple warm-ups made for your range: each one is repeated higher and lower, so the notes stay within the lowest and highest note you set. Each exercise has the syllables under the grid.</p>
       </div>
     </details>
     <details class="settings">

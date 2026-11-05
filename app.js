@@ -23,9 +23,9 @@
 
   const state = {
     running: false, a4: 440, windowSec: 12, range: 'auto', sens: 50,
-    speed: 1, countIn: true, guideMine: true, guideOthers: true, octave: 'any', partName: '', agc: false, names: 'letters', staff: 'off', lyrics: true, lyricLane: false, level: 1, exercise: 'scales', exVar: '', exMode: 'guide', exLen: 8, exLo: 40, exHi: 62,
+    speed: 1, countIn: true, guideMine: true, guideOthers: true, octave: 'any', partName: '', agc: false, names: 'letters', staff: 'off', lyrics: true, lyricLane: false, level: 1, mode: 'songs', exercise: 'scales', exVar: '', exMode: 'guide', exLen: 8, exLo: 40, exHi: 62,
   };
-  const PERSIST = ['a4', 'windowSec', 'range', 'sens', 'speed', 'countIn', 'guideMine', 'guideOthers', 'octave', 'partName', 'agc', 'names', 'staff', 'lyrics', 'lyricLane', 'level', 'exercise', 'exVar', 'exMode', 'exLen', 'exLo', 'exHi'];
+  const PERSIST = ['mode', 'a4', 'windowSec', 'range', 'sens', 'speed', 'countIn', 'guideMine', 'guideOthers', 'octave', 'partName', 'agc', 'names', 'staff', 'lyrics', 'lyricLane', 'level', 'exercise', 'exVar', 'exMode', 'exLen', 'exLo', 'exHi'];
   try {
     const saved = JSON.parse(localStorage.getItem('pitchtrace.settings') || '{}');
     for (const k of PERSIST) if (saved[k] != null) state[k] = saved[k];
@@ -43,6 +43,7 @@
   if (state.exercise === 'long') { state.exercise = 'single'; state.exMode = 'guide'; }
   if (state.exercise === 'hold') state.exercise = 'single';
   { const m = { five: 'scales', scale: 'scales', arp: 'intervals', leaps: 'intervals' }[state.exercise]; if (m) { state.exVar = state.exercise; state.exercise = m; } }
+  if (state.mode !== 'exercises') state.mode = 'songs';
   if (state.exMode !== 'memory') state.exMode = 'guide';
   if (![5, 8, 12].includes(Number(state.exLen))) state.exLen = 8;
   state.exLen = Number(state.exLen);
@@ -931,8 +932,33 @@
     for (const s of songs) songSel.add(new Option(s.name.replace(/\.(mid|midi|kar)$/i, ''), s.id));
     if (song && song.exercise) songSel.add(new Option('Exercise: ' + song.name, song.id));
     songSel.value = song ? song.id : '';
-    songField.hidden = songs.length === 0;
+    songField.hidden = songs.length === 0 || state.mode === 'exercises';
   }
+
+  /* Two modes: Songs (load a MIDI file, pick a part) and Exercises (the warm-ups). Only the controls of the active mode show.
+     Switching away from a song keeps it as the one to come back to. */
+  const modeBtns = { songs: $('modeSongs'), exercises: $('modeEx') };
+  const exPanelEl = $('exPanel');
+  function applyMode() {
+    const ex = state.mode === 'exercises';
+    for (const k in modeBtns) { modeBtns[k].setAttribute('aria-pressed', String(k === state.mode)); }
+    loadBtn.hidden = ex;
+    exPanelEl.hidden = !ex; exPanelEl.open = ex; exPanelEl.classList.toggle('pinned', ex);
+    songField.hidden = songs.length === 0 || ex;
+    if (ex) partField.hidden = true; else if (score && song && !song.exercise) partField.hidden = score.parts.length < 2;
+  }
+  function setMode(m) {
+    if (m === state.mode) return;
+    state.mode = m; save();
+    if (m === 'exercises') { if (song && !song.exercise) closeSong(true); }
+    else {
+      const rec = songs.find((s) => s.id === lsGet('pitchtrace.last'));
+      if (song && song.exercise) { if (rec) openSong(rec); else closeSong(true); }
+    }
+    applyMode();
+  }
+  modeBtns.songs.addEventListener('click', () => setMode('songs'));
+  modeBtns.exercises.addEventListener('click', () => setMode('exercises'));
 
   function fillParts() {
     partSel.innerHTML = '';
@@ -1003,7 +1029,7 @@
     return true;
   }
 
-  function closeSong() {
+  function closeSong(keepLast) {
     pause();
     score = null; song = null; bars = []; queue = []; flats = false;
     transportEl.hidden = true; partField.hidden = true; othersField.hidden = true; pickupField.hidden = true; tempoField.hidden = true; removeBtn.hidden = true;
@@ -1011,7 +1037,7 @@
     if (state.range === 'score') { state.range = 'auto'; rangeSel.value = 'auto'; }
     pts.length = 0; med.length = 0; lastVoiced = null; breakPushed = true;
     lineEl.hidden = true; linesFor = null; run = null; hideResult(); refreshScoreBtn(); roundEl.hidden = true;
-    lsSet('pitchtrace.last', null);
+    if (!keepLast) lsSet('pitchtrace.last', null);
     fillSongs(); updateEmpty(); showNote(null); snapView(); draw();
   }
 
@@ -1448,6 +1474,7 @@
   showNote(null);
   updateEmpty();
   resize();
+  applyMode();
 
   if (library) {
     library.list().then((list) => {
@@ -1455,7 +1482,8 @@
       fillSongs();
       const last = lsGet('pitchtrace.last');
       const rec = songs.find((s) => s.id === last);
-      if (rec) openSong(rec);
+      if (rec && state.mode === 'songs') openSong(rec);
+      applyMode();
     }).catch(() => { /* no saved songs on this device */ });
   }
 })();

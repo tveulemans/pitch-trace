@@ -149,3 +149,12 @@
 
   .lyric-line .cur.spelling span { border-bottom: 1px solid var(--accent); }
   .lyric-line .spell-input { font: inherit; color: var(--ink); background: var(--surface, transparent); border: 1px solid var(--accent); border-radius: 4px; padding: 0 2px; width: auto; min-width: 3ch; }
+
+  .modes { display: flex; width: 100%; gap: 0; }
+  .modes .btn { flex: 1; border-radius: 0; }
+  .modes .btn:first-child { border-radius: 10px 0 0 10px; }
+  .modes .btn:last-child { border-radius: 0 10px 10px 0; }
+  .modes .btn[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); box-shadow: none; font-weight: 700; }
+  #exPanel.pinned summary { display: none; }
+  #exPanel.pinned .grid { padding-top: 0; }
+  #exPanel[hidden] { display: none; }
