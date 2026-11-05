@@ -945,6 +945,10 @@
     loadBtn.hidden = ex;
     exPanelEl.hidden = !ex; exPanelEl.open = ex; exPanelEl.classList.toggle('pinned', ex);
     songField.hidden = songs.length === 0 || ex;
+    document.querySelectorAll('[data-ex]').forEach((el) => { el.hidden = !ex; });
+    showHoldOptions();
+    $('progItemLabel').textContent = ex ? 'Exercise' : 'Song';
+    progSel = -1; fillProgItems(); drawProgress();
     if (ex) partField.hidden = true; else if (score && song && !song.exercise) partField.hidden = score.parts.length < 2;
   }
   function setMode(m) {
@@ -1137,7 +1141,8 @@
   /* Progress chart: one point per scored run, with the average of the last five runs as a line. */
   function fillProgItems(want) {
     const latest = new Map();
-    for (const h of history) latest.set(h.k, h);
+    const prefix = state.mode === 'exercises' ? 'ex:' : 'song:';       // songs and exercises have separate progress
+    for (const h of history) if (h.k.startsWith(prefix)) latest.set(h.k, h);
     const keys = Array.from(latest.values()).sort((a, b) => b.t - a.t);
     const cur = want || progItem.value || (song && score ? keyOf() : '');
     progItem.innerHTML = '';
@@ -1171,7 +1176,7 @@
     c.clearRect(0, 0, r.width, r.height);
     progClear.hidden = !entriesFor(progItem.value).length;
     if (!list.length) {
-      progSummary.textContent = history.length ? '' : 'Finish an exercise or a song from the start to see your first score here.';
+      progSummary.textContent = state.mode === 'exercises' ? 'Finish an exercise from the start to see your first score here.' : 'Play a song from the start and score the run to see your first score here.';
       progInfo.textContent = '';
       progCv.xs = null;
       return;
@@ -1293,7 +1298,7 @@
   exModeSel.value = state.exMode; exLenSel.value = String(state.exLen);
   const showHoldOptions = () => {
     const ex = exercises.list.find((e) => e.id === state.exercise) || {};
-    exModeField.hidden = !ex.hold; exLenField.hidden = !ex.hold;
+    exModeField.hidden = !ex.hold; exLenField.hidden = !ex.hold || state.mode !== 'exercises';
     exVarField.hidden = !ex.variants;
     exVarSel.innerHTML = '';
     if (ex.variants) {

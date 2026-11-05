@@ -110,7 +110,7 @@
     <details class="settings" id="progPanel">
       <summary>Progress</summary>
       <div class="grid">
-        <label class="field">Exercise or song <select id="progItem"></select></label>
+        <label class="field"><span id="progItemLabel">Song</span> <select id="progItem"></select></label>
         <label class="field">Show
           <select id="progMetric">
             <option value="distance">Typical distance from the note (semitones)</option>
@@ -136,25 +136,25 @@
             <option value="memory">Listen first, sing from memory</option>
           </select>
         </label>
-        <label class="field" id="exLenField" hidden>Note length
+        <div class="field" style="display:grid;gap:6px;justify-items:start">
+          <button class="btn primary" id="exGo" type="button">Start exercise</button>
+          <span id="exNote" aria-live="polite"></span>
+        </div>
+        <p class="help">Simple warm-ups made for your range: each one is repeated higher and lower, so the notes stay within the lowest and highest note you set. Set the note length and the lowest and highest note under Settings. Each exercise has the syllables under the grid.</p>
+      </div>
+    </details>
+    <details class="settings">
+      <summary>Settings</summary>
+      <div class="grid">
+        <label class="field" id="exLenField" hidden>Exercise: note length
           <select id="exLen">
             <option value="5">5 seconds</option>
             <option value="8">8 seconds</option>
             <option value="12">12 seconds</option>
           </select>
         </label>
-        <label class="field">Lowest note <select id="exLo"></select></label>
-        <label class="field">Highest note <select id="exHi"></select></label>
-        <div class="field" style="display:grid;gap:6px;justify-items:start">
-          <button class="btn primary" id="exGo" type="button">Start exercise</button>
-          <span id="exNote" aria-live="polite"></span>
-        </div>
-        <p class="help">Simple warm-ups made for your range: each one is repeated higher and lower, so the notes stay within the lowest and highest note you set. Each exercise has the syllables under the grid.</p>
-      </div>
-    </details>
-    <details class="settings">
-      <summary>Settings</summary>
-      <div class="grid">
+        <label class="field" data-ex hidden>Exercise: lowest note <select id="exLo"></select></label>
+        <label class="field" data-ex hidden>Exercise: highest note <select id="exHi"></select></label>
         <label class="field">Count-in
           <input type="checkbox" id="countIn" checked>
         </label>
