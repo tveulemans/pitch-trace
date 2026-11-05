@@ -159,3 +159,7 @@
   #exPanel.pinned .grid { padding-top: 0; }
   #exPanel[hidden] { display: none; }
   .lyric-line .lyric-warn { font-size: 13px; padding: 2px 0; }
+  .readout { min-height: 77px; }
+  .readout[data-q="idle"] .cents, .readout[data-q="idle"] .hz { display: none; }
+  .readout[data-q="idle"] .verdict { font-size: 15px; }
+  .readout[data-q="idle"] .note { opacity: .6; }
