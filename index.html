@@ -22,6 +22,11 @@
     <span class="status" id="status" data-s="off" role="status"><i></i><span id="statusText">Microphone off</span></span>
   </header>
 
+  <div class="modes" role="group" aria-label="Practise">
+    <button class="btn" id="modeSongs" type="button" aria-pressed="true">Songs</button>
+    <button class="btn" id="modeEx" type="button" aria-pressed="false">Exercises</button>
+  </div>
+
   <section class="readout" id="readout" data-q="idle">
     <div class="note" id="note">&mdash;</div>
     <div class="side">
@@ -45,7 +50,7 @@
 
   <div class="plot" id="plot">
     <canvas id="cv"></canvas>
-    <div class="empty" id="empty"><p>Press Start and sing a note. Your pitch scrolls left; the right edge is now. To practise a part, load a MIDI file.</p></div>
+    <div class="empty" id="empty"><p>Press Start listening and sing a note. Your pitch scrolls left; the right edge is now. To practise a part, load a MIDI file.</p></div>
   </div>
 
   <div class="lyric-line" id="lyricLine" hidden aria-label="Lyrics"><div class="cur"></div><div class="nxt"></div><div class="lyric-warn" id="lyricWarn" hidden></div><button class="fix" id="lyricFix" type="button" aria-pressed="false" hidden>Fix lyrics</button><button class="fix" id="lyricSpell" type="button" hidden>Switch to spelling</button></div>
@@ -82,11 +87,7 @@
   <p class="msg" id="msg" role="alert" hidden></p>
 
   <div class="controls">
-    <div class="modes" role="group" aria-label="Practise">
-      <button class="btn" id="modeSongs" type="button" aria-pressed="true">Songs</button>
-      <button class="btn" id="modeEx" type="button" aria-pressed="false">Exercises</button>
-    </div>
-    <button class="go" id="toggle" type="button" data-on="false">Start</button>
+    <button class="go" id="toggle" type="button" data-on="false">Start listening</button>
     <button class="btn" id="load" type="button">Load MIDI</button>
     <input type="file" id="file" accept=".mid,.midi,.kar,audio/midi,audio/x-midi" hidden>
     <label class="field" id="songField" hidden>Song

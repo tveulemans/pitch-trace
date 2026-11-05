@@ -789,7 +789,7 @@
 
     pts.length = 0; med.length = 0; lastVoiced = null; jump = 0; breakPushed = true;
     state.running = true; stopTime = 0;
-    toggleBtn.textContent = 'Stop'; toggleBtn.dataset.on = 'true';
+    toggleBtn.textContent = 'Stop listening'; toggleBtn.dataset.on = 'true';
     updateEmpty();
     setStatus('listening', 'Listening');
     showNote(null);
@@ -804,7 +804,7 @@
     if (stream) stream.getTracks().forEach((t) => t.stop());
     try { if (source) source.disconnect(); } catch (e) { /* already gone */ }
     stream = null; source = null; analyser = null;
-    toggleBtn.textContent = 'Start'; toggleBtn.dataset.on = 'false';
+    toggleBtn.textContent = 'Start listening'; toggleBtn.dataset.on = 'false';
     setStatus('off', 'Microphone off');
     lastVoiced = null;
     showNote(null);
@@ -981,7 +981,7 @@
     if (song && song.exercise) { rangeInfo.append(' \u00b7 ' + (song.help || '')); lyricWarn.hidden = true; }
     else {
       const n = lyricNotice();
-      if (n.info) rangeInfo.append(' \u00b7 ' + n.info);
+      if (n.info && !n.warn) rangeInfo.append(' \u00b7 ' + n.info);   // a warning is shown once, under the lyrics
       lyricWarn.textContent = n.warn; lyricWarn.hidden = !n.warn;
     }
     if (song && !song.exercise) { state.exLo = clamp(p.lo, 28, 84); state.exHi = clamp(p.hi, 28, 84); save(); fillExRange(); }
