@@ -115,3 +115,11 @@ The service worker fetches fresh files whenever you are online, so a new version
 ## Look and feel
 
 The pitch line shades smoothly from green through amber to red as you drift from the note, and the target note glows softly while you are on it. After a scored run, a card shows the score, a row of dots (one per note: filled green found, amber sung but missed, empty not sung; long songs group the notes) and a badge with your best score at the same level. Play is the main button, Start listening is outlined, and Load MIDI is a quiet link.
+
+## Practising a section
+
+Under the position slider (songs only) you can **loop** a range of bars: tick *Loop bars*, choose the first and last bar, and press Play. At the end of the last bar the song jumps straight back to the first, with no count-in, and each pass shows a score ("Pass 3: 72% of the notes found, best 80%"). Loop passes are not stored in your progress history; use *Score this run* for that. Tick *Speed up after a good pass* and the speed climbs one step (50, 60, 70, 85, 100%) after every pass that finds at least 80% of the notes. The guide tone keeps its pitch at every speed.
+
+## Audio delay
+
+Bluetooth headphones and some phones play sound late, which makes your voice look late too. In **Settings**, *Audio delay (ms)* shifts your line back by that amount. *Measure by tapping* plays ten clicks; tap the button on each one and the app sets the delay for you. Taps tend to come a little early, so you may want to add a few milliseconds by hand.

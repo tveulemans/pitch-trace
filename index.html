@@ -74,6 +74,7 @@
       <label class="field">Speed
         <select id="speed">
           <option value="0.5">50%</option>
+          <option value="0.6">60%</option>
           <option value="0.7">70%</option>
           <option value="0.85">85%</option>
           <option value="1" selected>100%</option>
@@ -82,6 +83,13 @@
       <span class="pos" id="posText">Bar 1 &middot; 0:00 / 0:00</span>
     </div>
     <input type="range" id="seek" min="0" max="1" step="0.01" value="0" aria-label="Position in the song">
+    <div class="row loop" id="loopRow" hidden>
+      <label class="check"><input type="checkbox" id="loopOn"> Loop bars</label>
+      <input type="number" id="loopFrom" inputmode="numeric" min="1" value="1" aria-label="First bar of the loop">
+      <span>to</span>
+      <input type="number" id="loopTo" inputmode="numeric" min="1" value="4" aria-label="Last bar of the loop">
+      <label class="check"><input type="checkbox" id="loopAuto"> Speed up after a good pass</label>
+    </div>
     <p class="range-info" id="rangeInfo"></p>
   </section>
 
@@ -147,6 +155,10 @@
     <details class="settings">
       <summary>Settings</summary>
       <div class="grid">
+        <label class="field">Audio delay (ms) <input type="number" id="latency" inputmode="numeric" min="0" max="500" step="10" value="0"></label>
+        <div class="field wide"><button class="btn small" id="latencyTap" type="button">Measure by tapping</button>
+          <p class="range-info" id="latencyMsg" hidden></p>
+          <p class="range-info">Bluetooth headphones and some phones play sound late. Your voice then looks late too. This shifts your line back by that delay.</p></div>
         <label class="field" id="exLenField" hidden>Exercise: note length
           <select id="exLen">
             <option value="5">5 seconds</option>

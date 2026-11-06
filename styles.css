@@ -182,3 +182,9 @@
   .go[data-on="true"] { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--ink); box-shadow: inset 0 0 0 2px var(--accent); }
   .btn.quiet { box-shadow: none; color: var(--muted); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; padding-left: 8px; padding-right: 8px; }
   @media (prefers-reduced-motion: reduce) { #play { box-shadow: none; } }
+
+  .loop { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 4px 0; font-size: 14px; }
+  .loop input[type="number"] { width: 4.2em; padding: 7px 8px; border-radius: 8px; border: 1px solid var(--grid-strong); background: var(--panel); color: var(--ink); font: inherit; }
+  .loop .check { display: inline-flex; align-items: center; gap: 6px; }
+  #latency { width: 6em; padding: 7px 8px; border-radius: 8px; border: 1px solid var(--grid-strong); background: var(--panel); color: var(--ink); font: inherit; }
+  .field.wide { grid-column: 1 / -1; display: grid; gap: 4px; }

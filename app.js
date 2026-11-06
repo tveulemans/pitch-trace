@@ -23,9 +23,9 @@
 
   const state = {
     running: false, a4: 440, windowSec: 12, range: 'auto', sens: 50,
-    speed: 1, countIn: true, guideMine: true, guideOthers: true, octave: 'any', partName: '', agc: false, names: 'letters', staff: 'off', lyrics: true, lyricLane: false, level: 1, mode: 'songs', exercise: 'scales', exVar: '', exMode: 'guide', exLen: 8, exLo: 40, exHi: 62,
+    speed: 1, countIn: true, guideMine: true, guideOthers: true, octave: 'any', partName: '', agc: false, names: 'letters', staff: 'off', lyrics: true, lyricLane: false, level: 1, latency: 0, loopAuto: false, mode: 'songs', exercise: 'scales', exVar: '', exMode: 'guide', exLen: 8, exLo: 40, exHi: 62,
   };
-  const PERSIST = ['mode', 'a4', 'windowSec', 'range', 'sens', 'speed', 'countIn', 'guideMine', 'guideOthers', 'octave', 'partName', 'agc', 'names', 'staff', 'lyrics', 'lyricLane', 'level', 'exercise', 'exVar', 'exMode', 'exLen', 'exLo', 'exHi'];
+  const PERSIST = ['mode', 'a4', 'windowSec', 'range', 'sens', 'speed', 'countIn', 'guideMine', 'guideOthers', 'octave', 'partName', 'agc', 'names', 'staff', 'lyrics', 'lyricLane', 'level', 'latency', 'loopAuto', 'exercise', 'exVar', 'exMode', 'exLen', 'exLo', 'exHi'];
   try {
     const saved = JSON.parse(localStorage.getItem('pitchtrace.settings') || '{}');
     for (const k of PERSIST) if (saved[k] != null) state[k] = saved[k];
@@ -37,6 +37,9 @@
   if (state.staff !== 'bass') state.staff = 'off';
   state.lyrics = state.lyrics !== false;
   state.lyricLane = state.lyricLane === true;
+  state.latency = Math.min(500, Math.max(0, Math.round(Number(state.latency)) || 0));
+  state.loopAuto = state.loopAuto === true;
+  { const S = [0.5, 0.6, 0.7, 0.85, 1]; if (!S.includes(state.speed)) state.speed = S.reduce((b, v) => (Math.abs(v - state.speed) < Math.abs(b - state.speed) ? v : b), 1); }
   state.level = Math.min(5, Math.max(1, Math.round(Number(state.level)) || 1));
   // The old "Long notes" and "Find the note" exercises are now modes of "Hold the note".
   if (state.exercise === 'find') { state.exercise = 'single'; state.exMode = 'memory'; }
@@ -68,6 +71,8 @@
   const toggleBtn = $('toggle'), rangeSel = $('range'), winSel = $('win'), a4In = $('a4'), sensIn = $('sens');
   const levelBar = $('levelBar'), gateMark = $('gateMark'), msgEl = $('msg'), emptyEl = $('empty');
   const transportEl = $('transport'), playBtn = $('play'), restartBtn = $('restart'), speedSel = $('speed');
+  const loopRow = $('loopRow'), loopOn = $('loopOn'), loopFrom = $('loopFrom'), loopTo = $('loopTo'), loopAutoCb = $('loopAuto');
+  const latencyIn = $('latency'), latencyBtn = $('latencyTap'), latencyMsg = $('latencyMsg');
   const posText = $('posText'), seekEl = $('seek');
   const loadBtn = $('load'), fileIn = $('file'), songField = $('songField'), songSel = $('song');
   const partField = $('partField'), partSel = $('part'), scoreRangeOpt = $('scoreRange');
@@ -205,10 +210,66 @@
     }
   }
 
+  /* ---------- loop a section ---------- */
+
+  const loop = { on: false, a: 0, b: 0, pass: 0, best: 0 };
+  const SPEEDS = [0.5, 0.6, 0.7, 0.85, 1];
+  function loopBars() {                       // bar numbers the song has, for the inputs
+    const nums = bars.filter((b) => b.n >= 1).map((b) => b.n);
+    return nums.length ? [nums[0], nums[nums.length - 1]] : [1, 1];
+  }
+  function loopRange() {                      // seconds from the start of the first bar to the end of the last
+    const [lo, hi] = loopBars();
+    let f = Math.round(Number(loopFrom.value)) || lo, t = Math.round(Number(loopTo.value)) || f;
+    f = clamp(f, lo, hi); t = clamp(t, f, hi);
+    const A = bars.find((b) => b.n === f), i = bars.findIndex((b) => b.n === t);
+    const B = bars[i + 1];
+    return { f, t, a: A ? A.sec : 0, b: B ? B.sec : score.durationSec };
+  }
+  function syncLoop() {
+    if (!score || !bars.length) { loop.on = false; return; }
+    const r = loopRange();
+    loop.a = r.a; loop.b = r.b;
+    loop.on = loopOn.checked && loop.b - loop.a > 0.2;
+    loopFrom.value = String(r.f); loopTo.value = String(r.t);
+  }
+  function updateLoopUI() {
+    const ok = !!score && !!song && !song.exercise && bars.length > 0;
+    loopRow.hidden = !ok;
+    if (!ok) { loopOn.checked = false; loop.on = false; return; }
+    if (loop.songId !== song.id) { loop.songId = song.id; loop.touched = false; loopOn.checked = false; loopFrom.value = '1'; loopTo.value = '4'; }
+    const [lo, hi] = loopBars();
+    for (const el of [loopFrom, loopTo]) { el.min = String(lo); el.max = String(hi); }
+    syncLoop();
+  }
+  function loopPassScore(r) {
+    const notes = score.parts[r.part].notes.filter((n) => n.start >= r.from - 0.05);
+    const res = scoring.scoreRun(notes, r.frames, { level: state.level, fold: state.octave === 'any', until: loop.b });
+    loop.pass++;
+    if (!res || res.sung === 0) { roundEl.hidden = false; roundEl.dataset.q = 'idle'; roundEl.textContent = 'Pass ' + loop.pass + ': no singing was heard.'; return; }
+    loop.best = Math.max(loop.best, res.found);
+    let txt = 'Pass ' + loop.pass + ': ' + res.found + '% of the notes found (best ' + loop.best + '%)';
+    if (state.loopAuto && res.found >= 80) {
+      const k = SPEEDS.indexOf(state.speed);
+      if (k >= 0 && k < SPEEDS.length - 1) { setSpeed(SPEEDS[k + 1]); txt += ', speeding up to ' + Math.round(state.speed * 100) + '%'; }
+    }
+    roundEl.hidden = false; roundEl.textContent = txt + '.';
+    roundEl.dataset.q = res.found >= 80 ? 'good' : res.found >= 50 ? 'warn' : 'bad';
+  }
+  function wrapLoop() {
+    if (run) { run.reach = loop.b; loopPassScore(run); }
+    rebase(loop.a);                           // jump back without a count-in; the rhythm carries on
+    dropFuture(loop.a);
+    run = { frames: [], part: partIdx, reach: 0, from: loop.a };
+    qi = 0;
+  }
+
   function scheduler() {
     if (!tp.playing || !audioCtx) return;
     const p = tlNow();
-    const horizon = p + LOOKAHEAD * state.speed;
+    if (loop.on && p >= loop.b) { wrapLoop(); return; }
+    const cap = loop.on ? loop.b : Infinity;
+    const horizon = Math.min(p + LOOKAHEAD * state.speed, cap);
     const at = (s) => audioCtx.currentTime + Math.max(0, (s - p) / state.speed);
     while (ki < clicks.length && clicks[ki].t < horizon) { click(at(clicks[ki].t), clicks[ki].accent); ki++; }
     while (qi < queue.length) {
@@ -219,7 +280,7 @@
       qi++;
       if (n.end <= p || !(n.always || (n.mine ? state.guideMine : state.guideOthers))) continue;
       const from = Math.max(s, p);
-      voice(at(from), (n.end - from) / state.speed, n.midi, n.mine);
+      voice(at(from), (Math.min(n.end, cap) - from) / state.speed, n.midi, n.mine);
     }
   }
 
@@ -312,7 +373,8 @@
     const db = 20 * Math.log10(Math.sqrt(sum / buf.length) + 1e-9);
     setLevel(db);
     if (calib) { calib.max = Math.max(calib.max, db); calib.n++; }
-    const t = tlNow();
+    // What you hear arrives late (Bluetooth, phone speaker), so your voice answers later than the timeline: shift it back.
+    const t = tlNow() - (score && tp.playing ? (state.latency / 1000) * state.speed : 0);
     const aw = wall(), adt = lastAw ? Math.min(0.1, aw - lastAw) : 0.032;
     lastAw = aw;
     const rec = !score || (tp.playing && t >= tp.pos0); // not recorded while paused or during the count-in
@@ -892,6 +954,8 @@
       if (!state.running) await start();
     } finally { starting = false; }
     if (!score || tp.playing) return;
+    syncLoop();
+    if (loop.on && (tp.pos < loop.a - 0.01 || tp.pos >= loop.b - 0.05)) tp.pos = loop.a;
     if (tp.pos >= score.durationSec - 0.05) tp.pos = tp.startPos;
     const pos0 = tp.pos;
     const mi = score.meterAt(pos0);
@@ -903,7 +967,7 @@
     tp.baseWall = wall();
     tp.playing = true;
     resetRounds();
-    if (pos0 <= tp.startPos + 0.05) { run = { frames: [], part: partIdx, reach: 0 }; hideResult(); }
+    if (pos0 <= tp.startPos + 0.05 || loop.on) { run = { frames: [], part: partIdx, reach: 0, from: loop.on ? pos0 : 0 }; hideResult(); loop.pass = 0; loop.best = 0; }
     refreshScoreBtn();
     qi = 0; ki = 0;
     dropFuture(tp.basePos);
@@ -1001,6 +1065,7 @@
 
   // "Bass: lowest Ab2, highest C4 (1 octave and 4 semitones)"
   function updateRangeInfo() {
+    updateLoopUI();
     const p = score.parts[partIdx];
     const span = p.hi - p.lo;
     const oct = Math.floor(span / 12), rem = span % 12;
@@ -1069,6 +1134,7 @@
     pts.length = 0; med.length = 0; lastVoiced = null; breakPushed = true;
     lineEl.hidden = true; linesFor = null; run = null; hideResult(); refreshScoreBtn(); roundEl.hidden = true;
     if (!keepLast) lsSet('pitchtrace.last', null);
+    updateLoopUI();
     fillSongs(); updateEmpty(); showNote(null); snapView(); draw();
   }
 
@@ -1120,7 +1186,7 @@
     const r = run; run = null; refreshScoreBtn();
     if (!r || !score) return;
     const partial = until !== Infinity;
-    const res = scoring.scoreRun(score.parts[r.part].notes, r.frames, { level: state.level, fold: state.octave === 'any', until: partial ? r.reach : Infinity });
+    const res = scoring.scoreRun(score.parts[r.part].notes.filter((n) => n.start >= (r.from || 0) - 0.05), r.frames, { level: state.level, fold: state.octave === 'any', until: partial ? r.reach : Infinity });
     if (!res) { showMsg('Nothing to score yet: sing through at least one whole note first.'); return; }
     if (res.sung === 0) { showMsg('No singing was heard during that run, so it was not scored.'); return; }
     const key = keyOf();
@@ -1395,6 +1461,54 @@
   restartBtn.addEventListener('click', () => { if (score) setPos(tp.startPos); });
   seekEl.addEventListener('input', () => { if (!score) return; lastSeekInput = performance.now(); setPos(Number(seekEl.value)); });
 
+  loopAutoCb.checked = state.loopAuto;
+  loopAutoCb.addEventListener('change', () => { state.loopAuto = loopAutoCb.checked; save(); });
+  loopOn.addEventListener('change', () => {
+    if (loopOn.checked && score) {
+      // Start from the bar you are at, four bars long, unless the numbers were set already.
+      const b = barAt(clamp(tlNow(), 0, score.durationSec)), [, hi] = loopBars();
+      if (!loop.touched) { const f = Math.max(1, b ? b.n : 1); loopFrom.value = String(Math.min(f, hi)); loopTo.value = String(Math.min(f + 3, hi)); }
+    }
+    syncLoop();
+    if (!loop.on) roundEl.hidden = !(song && song.callResponse);
+  });
+  for (const el of [loopFrom, loopTo]) el.addEventListener('change', () => { loop.touched = true; if (el === loopFrom && Number(loopTo.value) < Number(loopFrom.value)) loopTo.value = loopFrom.value; syncLoop(); });
+
+  /* Audio delay: play a row of clicks, you tap on each one, and the average lateness is the delay to compensate. */
+  latencyIn.value = String(state.latency);
+  latencyIn.addEventListener('change', () => { state.latency = clamp(Math.round(Number(latencyIn.value)) || 0, 0, 500); latencyIn.value = String(state.latency); save(); });
+  let tapRun = null;
+  latencyBtn.addEventListener('pointerdown', (ev) => {
+    if (tapRun) { ev.preventDefault(); tapRun.taps.push(wall()); latencyBtn.textContent = 'Tap on each click (' + tapRun.taps.length + ')'; return; }
+    ensureCtx();
+    const t0 = audioCtx.currentTime + 1.2, N = 10, gap = 0.6, w0 = wall() + 1.2;
+    tapRun = { taps: [], clicks: [] };
+    for (let k = 0; k < N; k++) { click(t0 + k * gap, k % 4 === 0); tapRun.clicks.push(w0 + k * gap); }
+    latencyMsg.hidden = false; latencyMsg.textContent = 'Listen to the clicks and tap this button in time with each one.';
+    latencyBtn.textContent = 'Tap on each click (0)';
+    const run = tapRun;
+    setTimeout(() => {
+      tapRun = null; latencyBtn.textContent = 'Measure by tapping';
+      const offs = [];
+      for (const tap of run.taps) {
+        let best = null;
+        run.clicks.forEach((c, i) => { if (i >= 2 && (best == null || Math.abs(tap - c) < Math.abs(tap - best))) best = c; });
+        if (best != null && Math.abs(tap - best) < 0.35) offs.push((tap - best) * 1000);
+      }
+      if (offs.length < 4) { latencyMsg.textContent = 'Not enough taps were heard. Try again, tapping on every click.'; return; }
+      offs.sort((x, y) => x - y);
+      const med = offs[offs.length >> 1];
+      state.latency = clamp(Math.round(med / 10) * 10, 0, 500); latencyIn.value = String(state.latency); save();
+      latencyMsg.textContent = 'Measured about ' + Math.round(med) + ' ms, applied ' + state.latency + ' ms. You can also adjust it by hand.';
+    }, (1.2 + N * gap + 0.5) * 1000);
+  });
+
+  function setSpeed(v) {
+    const p = tp.playing ? tlNow() : 0;
+    state.speed = v; speedSel.value = String(v);
+    if (tp.playing) rebase(p);
+    save();
+  }
   speedSel.addEventListener('change', () => {
     const p = tp.playing ? tlNow() : 0;
     state.speed = Number(speedSel.value);
