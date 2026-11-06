@@ -188,3 +188,6 @@
   .loop .check { display: inline-flex; align-items: center; gap: 6px; }
   #latency { width: 6em; padding: 7px 8px; border-radius: 8px; border: 1px solid var(--grid-strong); background: var(--panel); color: var(--ink); font: inherit; }
   .field.wide { grid-column: 1 / -1; display: grid; gap: 4px; }
+
+  #syncBox input[type="text"], #syncBox input[type="password"] { width: 100%; padding: 8px; border-radius: 8px; border: 1px solid var(--grid-strong); background: var(--panel); color: var(--ink); font: inherit; }
+  #syncBox .row { display: flex; gap: 8px; flex-wrap: wrap; }

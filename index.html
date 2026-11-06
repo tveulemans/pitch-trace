@@ -156,6 +156,14 @@
       <summary>Settings</summary>
       <div class="grid">
         <label class="field">Audio delay (ms) <input type="number" id="latency" inputmode="numeric" min="0" max="500" step="10" value="0"></label>
+        <div class="field wide" id="syncBox">
+          <strong>Sync between devices</strong>
+          <p class="range-info">Keeps your songs, progress and main settings in a private GitHub repository, so your phone and computer share them. Create a fine-grained access token for that one repository, with "Contents: read and write", and paste it on each device.</p>
+          <label class="field">Repository <input type="text" id="syncRepo" autocomplete="off" autocapitalize="off" spellcheck="false" value="tveulemans/pitch-trace-data"></label>
+          <label class="field">Token <input type="password" id="syncToken" autocomplete="off" placeholder="github_pat_…"></label>
+          <div class="row"><button class="btn small" id="syncSave" type="button">Save and sync</button> <button class="btn small" id="syncNow" type="button">Sync now</button> <button class="btn small" id="syncOff" type="button">Turn off</button></div>
+          <p class="range-info" id="syncMsg" aria-live="polite">Sync is off.</p>
+        </div>
         <div class="field wide"><button class="btn small" id="latencyTap" type="button">Measure by tapping</button>
           <p class="range-info" id="latencyMsg" hidden></p>
           <p class="range-info">Bluetooth headphones and some phones play sound late. Your voice then looks late too. This shifts your line back by that delay.</p></div>
@@ -249,6 +257,7 @@
 <script src="scoring.js"></script>
 <script src="exercises.js"></script>
 <script src="library.js"></script>
+<script src="sync.js"></script>
 <script src="app.js"></script>
 <script>
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {

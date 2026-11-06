@@ -21,6 +21,7 @@
 
   /* ---------- settings ---------- */
 
+  var syncReady = false;      // set once the sync settings are loaded
   const state = {
     running: false, a4: 440, windowSec: 12, range: 'auto', sens: 50,
     speed: 1, countIn: true, guideMine: true, guideOthers: true, octave: 'any', partName: '', agc: false, names: 'letters', staff: 'off', lyrics: true, lyricLane: false, level: 1, latency: 0, loopAuto: false, mode: 'songs', exercise: 'scales', exVar: '', exMode: 'guide', exLen: 8, exLo: 40, exHi: 62,
@@ -59,6 +60,7 @@
       for (const k of PERSIST) out[k] = state[k];
       localStorage.setItem('pitchtrace.settings', JSON.stringify(out));
     } catch (e) { /* ignore */ }
+    if (syncReady) noteSettings();
   }
   const lsGet = (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
   const lsSet = (k, v) => { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) { /* ignore */ } };
@@ -1084,6 +1086,7 @@
   }
 
   function persistSong(rec) {
+    if (!rec.exercise) { rec.mod = Date.now(); scheduleSync(); }
     if (!library) return;
     library.put(rec).catch(() => showMsg('This device cannot keep songs between visits. The song stays available until you close the app.'));
   }
@@ -1198,6 +1201,7 @@
     });
     if (history.length > 600) history = history.slice(-600);
     lsSet(HKEY, JSON.stringify(history));
+    scheduleSync();
     showResult(res, prev, partial);
     progSel = -1; fillProgItems(key); drawProgress();
   }
@@ -1370,6 +1374,7 @@
     clearTimeout(clearTimer); clearTimer = 0; progClear.textContent = 'Clear history of this item';
     history = history.filter((h) => h.k !== progItem.value);
     lsSet(HKEY, JSON.stringify(history));
+    syncCfg.cleared[progItem.value] = Date.now(); saveSyncCfg(); scheduleSync();
     progSel = -1; fillProgItems(); drawProgress();
   });
   window.addEventListener('resize', drawProgress);
@@ -1624,6 +1629,7 @@
     clearTimeout(removeTimer); removeTimer = 0; removeBtn.textContent = 'Remove this song';
     const id = song.id;
     songs = songs.filter((s) => s.id !== id);
+    syncCfg.gone[id] = Date.now(); saveSyncCfg(); scheduleSync();
     if (library) library.remove(id).catch(() => {});
     closeSong();
   });
@@ -1647,6 +1653,116 @@
   resize();
   applyMode();
 
+  /* ---------- sync between devices (a private GitHub repository) ---------- */
+
+  const syncApi = window.PitchTrace.sync;
+  const SKEY = 'pitchtrace.sync';
+  const syncCfg = (() => {
+    let c = {};
+    try { c = JSON.parse(lsGet(SKEY) || '{}') || {}; } catch (e) { c = {}; }
+    return Object.assign({ token: '', repo: 'tveulemans/pitch-trace-data', last: 0, settingsT: 0, settingsVals: '', cleared: {}, gone: {} }, c);
+  })();
+  function saveSyncCfg() { lsSet(SKEY, JSON.stringify(syncCfg)); }
+  syncReady = true;
+  const syncRepoIn = $('syncRepo'), syncTokenIn = $('syncToken'), syncMsg = $('syncMsg');
+  const syncValues = () => { const o = {}; for (const k of syncApi.SYNCED) o[k] = state[k]; return o; };
+  function noteSettings() {                       // remember when a shared setting last changed on this device
+    const v = JSON.stringify(syncValues());
+    if (v !== syncCfg.settingsVals) { syncCfg.settingsVals = v; syncCfg.settingsT = Date.now(); saveSyncCfg(); scheduleSync(); }
+  }
+  const showSync = (t) => { syncMsg.textContent = t; };
+  const clock = (t) => new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  let syncing = false, syncTimer = 0, syncAgain = false;
+  function scheduleSync() {
+    if (!syncReady || !syncCfg.token) return;
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(() => syncNow(false), 4000);
+  }
+  async function collectLocal() {
+    const out = { history: history.slice(), cleared: syncCfg.cleared, gone: syncCfg.gone, songs: {}, settings: { vals: syncValues(), t: syncCfg.settingsT } };
+    for (const s of songs) if (!s.exercise && s.bytes) out.songs[s.id] = Object.assign({}, s, { bytes: syncApi.bytesToB64(s.bytes) });
+    return out;
+  }
+  async function applyMerged(m) {
+    if (!syncApi.same({ history }, { history: m.history })) {
+      history = m.history; lsSet(HKEY, JSON.stringify(history)); progSel = -1; fillProgItems(); drawProgress();
+    }
+    syncCfg.cleared = m.cleared; syncCfg.gone = m.gone;
+    let songsChanged = false;
+    for (const id in m.songs) {
+      const r = m.songs[id], mine = songs.find((s) => s.id === id);
+      if (mine && syncApi.modOf(mine) === syncApi.modOf(r)) continue;
+      const rec = Object.assign({}, r, { bytes: syncApi.b64ToBytes(r.bytes) });
+      songs = songs.filter((s) => s.id !== id).concat(rec);
+      if (library) await library.put(rec).catch(() => {});
+      songsChanged = true;
+    }
+    for (const mine of songs.slice()) {
+      if (mine.exercise || m.songs[mine.id]) continue;
+      songs = songs.filter((s) => s.id !== mine.id);                // removed on another device
+      if (library) await library.remove(mine.id).catch(() => {});
+      songsChanged = true;
+    }
+    if (songsChanged) { songs.sort((x, y) => x.name.localeCompare(y.name)); fillSongs(); }
+    let reload = false;
+    if (m.settings.t > syncCfg.settingsT) {
+      for (const k of syncApi.SYNCED) if (k in m.settings.vals && JSON.stringify(state[k]) !== JSON.stringify(m.settings.vals[k])) { state[k] = m.settings.vals[k]; reload = true; }
+      syncCfg.settingsT = m.settings.t; syncCfg.settingsVals = JSON.stringify(m.settings.vals);
+      try { const o = {}; for (const k of PERSIST) o[k] = state[k]; localStorage.setItem('pitchtrace.settings', JSON.stringify(o)); } catch (e) { /* ignore */ }
+    }
+    saveSyncCfg();
+    return reload;
+  }
+  async function syncNow(manual) {
+    if (!syncCfg.token || !syncCfg.repo) return;
+    if (syncing) { syncAgain = true; return; }
+    syncing = true; showSync('Syncing…');
+    try {
+      const remote = syncApi.remote(syncCfg);
+      let reload = false;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const rem = await remote.get();
+        const merged = syncApi.merge(await collectLocal(), rem && rem.data);
+        reload = (await applyMerged(merged)) || reload;
+        if (!rem || !syncApi.same(merged, rem.data)) {
+          try { await remote.put(merged, rem && rem.sha); }
+          catch (e) { if (e.conflict && attempt < 2) continue; throw e; }
+        }
+        break;
+      }
+      syncCfg.last = Date.now(); saveSyncCfg();
+      showSync('Synced at ' + clock(syncCfg.last) + '.');
+      if (reload) {
+        if (!state.running && !tp.playing && !sessionStorage.getItem('pt-synced-reload')) { sessionStorage.setItem('pt-synced-reload', '1'); location.reload(); }
+        else showSync('Synced at ' + clock(syncCfg.last) + '. Shared settings changed: reload the page to apply them.');
+      }
+    } catch (e) {
+      showSync(e && e.status ? e.message : navigator.onLine === false ? 'You are offline. Syncing will resume when you are back online.' : 'Sync failed: ' + (e && e.message ? e.message : 'unknown error'));
+    } finally {
+      syncing = false;
+      if (syncAgain) { syncAgain = false; scheduleSync(); }
+    }
+  }
+  syncRepoIn.value = syncCfg.repo;
+  syncTokenIn.placeholder = syncCfg.token ? '(saved on this device)' : 'github_pat_…';
+  showSync(syncCfg.token ? (syncCfg.last ? 'Last synced at ' + clock(syncCfg.last) + '.' : 'Not synced yet.') : 'Sync is off.');
+  $('syncSave').addEventListener('click', () => {
+    const repo = syncRepoIn.value.trim().replace(/^https?:\/\/github\.com\//, '').replace(/\.git$/, '').replace(/\/$/, '');
+    const token = syncTokenIn.value.trim() || syncCfg.token;
+    if (!/^[\w.-]+\/[\w.-]+$/.test(repo)) { showSync('Enter the repository as owner/name, for example tveulemans/pitch-trace-data.'); return; }
+    if (!token) { showSync('Paste the access token first.'); return; }
+    syncCfg.repo = repo; syncCfg.token = token; syncTokenIn.value = ''; syncTokenIn.placeholder = '(saved on this device)';
+    saveSyncCfg(); syncNow(true);
+  });
+  $('syncNow').addEventListener('click', () => { if (!syncCfg.token) showSync('Save the repository and token first.'); else syncNow(true); });
+  $('syncOff').addEventListener('click', () => {
+    syncCfg.token = ''; saveSyncCfg(); syncTokenIn.placeholder = 'github_pat_…'; showSync('Sync is off. Your data stays on this device and in the repository.');
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && syncCfg.token && Date.now() - syncCfg.last > 120000) syncNow(false);
+  });
+  window.addEventListener('online', () => scheduleSync());
+
   if (library) {
     library.list().then((list) => {
       songs = list;
@@ -1655,6 +1771,7 @@
       const rec = songs.find((s) => s.id === last);
       if (rec && state.mode === 'songs') openSong(rec);
       applyMode();
-    }).catch(() => { /* no saved songs on this device */ });
+      syncNow(false);
+    }).catch(() => { syncNow(false); });
   }
 })();

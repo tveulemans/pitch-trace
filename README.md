@@ -123,3 +123,9 @@ Under the position slider (songs only) you can **loop** a range of bars: tick *L
 ## Audio delay
 
 Bluetooth headphones and some phones play sound late, which makes your voice look late too. In **Settings**, *Audio delay (ms)* shifts your line back by that amount. *Measure by tapping* plays ten clicks; tap the button on each one and the app sets the delay for you. Taps tend to come a little early, so you may want to add a few milliseconds by hand.
+
+## Sync between devices
+
+Your songs, progress and the main settings can be kept in a private GitHub repository so your phone and computer share them. In **Settings → Sync between devices**, enter the repository (`owner/name`), paste a fine-grained access token that has *Contents: read and write* on that one repository only, and press **Save and sync**. Do the same on every device.
+
+The app syncs when it opens, a few seconds after you finish a run, add, change or remove a song, and when you come back to the tab. Data from the two devices is merged, so practising on both loses nothing: progress entries are combined, the most recently changed copy of a song wins, and removing a song or clearing an item's history on one device carries over to the others. Audio delay, microphone sensitivity, speed and the view window stay per device. The data is one file, `data.json`, in the repository. The token is kept in this browser only; **Turn off** forgets it.
