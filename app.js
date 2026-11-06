@@ -365,11 +365,29 @@
     return null;
   }
 
+  /* The trace shades smoothly from green through amber to red as you drift from the note. */
+  const rgbCache = {};
+  function rgbOf(s) {
+    if (rgbCache[s]) return rgbCache[s];
+    let m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(s), v;
+    if (m) { const h = m[1].length === 3 ? m[1].replace(/./g, '$&$&') : m[1]; v = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16)); }
+    else { m = /rgba?\(([^)]+)\)/.exec(s); v = m ? m[1].split(',').slice(0, 3).map(Number) : null; }
+    return (rgbCache[s] = v);
+  }
+  function mix(c1, c2, t) {
+    const a1 = rgbOf(c1), a2 = rgbOf(c2);
+    if (!a1 || !a2) return t < 0.5 ? c1 : c2;
+    return 'rgb(' + a1.map((v, i) => Math.round(v + (a2[i] - v) * t)).join(',') + ')';
+  }
   function colorForE(e) {
     if (e == null) return col.muted;
     const c = Math.abs(e) * 100;
-    return c <= GOOD ? col.good : c <= CLOSE ? col.warn : col.bad;
+    if (c <= GOOD) return col.good;
+    if (c <= CLOSE) return mix(col.good, col.warn, (c - GOOD) / (CLOSE - GOOD));
+    if (c <= 100) return mix(col.warn, col.bad, (c - CLOSE) / (100 - CLOSE));
+    return col.bad;
   }
+  let glow = 0;   // 0..1, eases towards 1 while you hold the note you should be singing
 
   function viewTarget(now) {
     if (state.range === 'score' && score) {
@@ -598,6 +616,9 @@
     c.setTransform(dpr, 0, 0, dpr, 0, 0);
     c.clearRect(0, 0, cssW, cssH);
     updateView(now, !(state.running || tp.playing));
+    const onNote = !!(lastVoiced && wall() - lastVoiced.w < 0.25 && lastVoiced.e != null && Math.abs(lastVoiced.e) * 100 <= GOOD);
+    glow += ((onNote ? 1 : 0) - glow) * 0.25;
+    if (glow < 0.02) glow = 0;
     updateLyricLine(now);
 
     const hasLyrics = !!(score && state.lyrics && state.lyricLane && lyricsOf().length);
@@ -716,6 +737,12 @@
         c.fillStyle = tone; c.fill();
         c.globalAlpha = a;
         c.strokeStyle = tone; c.lineWidth = active ? 2 : 1.25; c.stroke();
+        if (active && glow > 0) {            // a soft green halo while you are on the note
+          c.save();
+          c.shadowColor = col.good; c.shadowBlur = 20 * glow; c.globalAlpha = glow; c.strokeStyle = col.good; c.lineWidth = 3;
+          roundRect(c, x1, y - h / 2, w, h, 4); c.stroke(); c.stroke();
+          c.restore();
+        }
         const label = noteName(n.midi);
         if (w > label.length * 6.2 + 10) { c.fillStyle = col.ink; c.fillText(label, x1 + 5, y + 0.5); }
       }
@@ -1070,6 +1097,23 @@
     scoreBtn.hidden = !(run && !tp.playing && run.frames.length > 15);
   }
 
+  function renderDots(dots) {
+    const box = $('resDots'); box.textContent = '';
+    if (!dots || !dots.length) return;
+    const cls = ['miss', 'close', 'hit'];
+    let items;
+    if (dots.length <= 60) items = dots.map((d) => cls[d]);
+    else {                                  // long songs: one dot per group of notes, coloured by how many were found
+      const g = Math.ceil(dots.length / 60); items = [];
+      for (let i = 0; i < dots.length; i += g) {
+        const part = dots.slice(i, i + g), f = part.filter((d) => d === 2).length / part.length;
+        items.push(f >= 0.8 ? 'hit' : f >= 0.4 ? 'close' : 'miss');
+      }
+    }
+    for (const c of items) { const s = document.createElement('i'); s.className = c; box.append(s); }
+    const f = dots.filter((d) => d === 2).length, m = dots.filter((d) => d === 1).length, u = dots.filter((d) => d === 0).length;
+    box.setAttribute('aria-label', f + ' notes found, ' + m + ' sung but missed, ' + u + ' not sung');
+  }
   function hideResult() { resultEl.hidden = true; }
 
   function finishRun(until) {
@@ -1094,6 +1138,14 @@
 
   function showResult(res, prev, partial) {
     $('resScore').textContent = res.found + '%';
+    $('resScore').style.color = pointColor('found', res.found);
+    renderDots(res.dots);
+    const best = prev.filter((h) => h.level === state.level && h.found != null).reduce((m, h) => Math.max(m, h.found), -1);
+    const badge = $('resBadge');
+    badge.className = 'res-badge';
+    if (!prev.length || best < 0) badge.textContent = 'Starting point';
+    else if (res.found > best) { badge.textContent = 'New best'; badge.classList.add('best'); }
+    else badge.textContent = 'Best ' + best + '%';
     let d = 'of the notes found within ' + LEVEL_NAMES[state.level - 1] + ' (' + res.foundCount + ' of ' + res.notes + ').';
     if (res.dist != null) d += ' Typically ' + fmtSemi(res.dist) + ' from the note' + (res.dist < 0.1 ? '.' : res.bias < -0.1 ? ', mostly low.' : res.bias > 0.1 ? ', mostly high.' : '.');
     $('resDetail').textContent = d;

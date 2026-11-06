@@ -85,6 +85,7 @@
       bias: sungNotes.length ? r2(avg(sungNotes)) : 0,                                                              // semitones, positive is sharp
       wobble: wsum > 0 ? r1(100 * Math.sqrt(vsum / wsum)) : 0,                                                      // cents
       lowN: lows.length, lowAvg: r2(avg(lows)), highN: highs.length, highAvg: r2(avg(highs)),
+      dots: per.map((p) => (p.found[L] ? 2 : p.sung ? 1 : 0)),   // one per note: 2 found, 1 sung but missed, 0 not sung
       silentN: per.filter((p) => !p.sung).length,
       weakest,
     };

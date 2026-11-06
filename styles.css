@@ -163,3 +163,22 @@
   .readout[data-q="idle"] .cents, .readout[data-q="idle"] .hz { display: none; }
   .readout[data-q="idle"] .verdict { font-size: 15px; }
   .readout[data-q="idle"] .note { opacity: .6; }
+
+  /* Result card: dots, badge, and the score coloured by how good it is */
+  .res-top { flex-wrap: wrap; row-gap: 4px; }
+  .res-score { font-size: 40px; }
+  .res-detail { flex: 1; min-width: 10em; }
+  .res-badge { font-size: 12px; font-weight: 700; padding: 2px 9px; border-radius: 99px; color: var(--muted); box-shadow: inset 0 0 0 1.5px var(--grid-strong); white-space: nowrap; }
+  .res-badge.best { background: var(--good); color: var(--accent-ink); box-shadow: none; }
+  .res-dots { display: flex; flex-wrap: wrap; gap: 4px; margin: 2px 0 4px; }
+  .res-dots i { width: 10px; height: 10px; border-radius: 50%; background: transparent; box-shadow: inset 0 0 0 1.5px var(--grid-strong); }
+  .res-dots i.hit { background: var(--good); box-shadow: none; }
+  .res-dots i.close { background: var(--warn); box-shadow: none; }
+  .res-dots i.miss { background: transparent; }
+
+  /* Button hierarchy: Play is the main action; listening is secondary; loading a file is quiet */
+  #play { padding: 13px 28px; min-width: 7.5em; font-size: 16px; box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 35%, transparent); }
+  .go { background: transparent; color: var(--accent); box-shadow: inset 0 0 0 2px var(--accent); }
+  .go[data-on="true"] { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--ink); box-shadow: inset 0 0 0 2px var(--accent); }
+  .btn.quiet { box-shadow: none; color: var(--muted); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; padding-left: 8px; padding-right: 8px; }
+  @media (prefers-reduced-motion: reduce) { #play { box-shadow: none; } }

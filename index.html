@@ -58,7 +58,8 @@
   <p class="round" id="roundMsg" data-q="idle" hidden aria-live="polite"></p>
 
   <section class="result" id="result" hidden aria-live="polite">
-    <div class="res-top"><span class="res-score" id="resScore"></span><span class="res-detail" id="resDetail"></span></div>
+    <div class="res-top"><span class="res-score" id="resScore"></span><span class="res-detail" id="resDetail"></span><span class="res-badge" id="resBadge"></span></div>
+    <div class="res-dots" id="resDots" role="img"></div>
     <p id="resDir"></p>
     <p id="resWeak"></p>
     <p id="resTrend"></p>
@@ -88,7 +89,7 @@
 
   <div class="controls">
     <button class="go" id="toggle" type="button" data-on="false">Start listening</button>
-    <button class="btn" id="load" type="button">Load MIDI</button>
+    <button class="btn quiet" id="load" type="button">Load MIDI</button>
     <input type="file" id="file" accept=".mid,.midi,.kar,audio/midi,audio/x-midi" hidden>
     <label class="field" id="songField" hidden>Song
       <select id="song"><option value="">Free tuner (no score)</option></select>

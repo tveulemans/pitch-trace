@@ -111,3 +111,7 @@ The service worker fetches fresh files whenever you are online, so a new version
 1. Live tuner with scrolling pitch trace (done)
 2. Load a MIDI file of your voice part and draw the target notes behind your trace (done)
 3. Practice summary after each run (how many notes were in tune, whether you tend flat or sharp), loop a section, and a delay setting for Bluetooth headphones
+
+## Look and feel
+
+The pitch line shades smoothly from green through amber to red as you drift from the note, and the target note glows softly while you are on it. After a scored run, a card shows the score, a row of dots (one per note: filled green found, amber sung but missed, empty not sung; long songs group the notes) and a badge with your best score at the same level. Play is the main button, Start listening is outlined, and Load MIDI is a quiet link.
