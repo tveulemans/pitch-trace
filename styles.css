@@ -93,6 +93,9 @@
   .plot { position: relative; flex: 1; min-height: 200px; border: 1px solid var(--grid); border-radius: 10px; background: var(--panel); overflow: hidden; }
   .plot canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
   .empty { position: absolute; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center; color: var(--muted); font-size: 14px; pointer-events: none; }
+  .empty .empty-box { display: grid; gap: 14px; justify-items: center; }
+  .empty .empty-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; pointer-events: auto; }
+  .empty .empty-actions .btn { min-width: 9em; }
   .empty p { margin: 0; max-width: 32ch; }
 
   .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; }
@@ -191,3 +194,33 @@
 
   #syncBox input[type="text"], #syncBox input[type="password"] { width: 100%; padding: 8px; border-radius: 8px; border: 1px solid var(--grid-strong); background: var(--panel); color: var(--ink); font: inherit; }
   #syncBox .row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  /* Lyrics strip: larger current syllable, soft edges, a short fade when the line changes */
+  .lyric-line .cur span { display: inline-block; white-space: pre; transition: color .15s, background-color .15s, transform .15s; }
+  .lyric-line .cur .now { transform: scale(1.12); box-shadow: 0 0 14px color-mix(in srgb, var(--accent) 45%, transparent); }
+  .lyric-line .cur, .lyric-line .nxt { -webkit-mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent); mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent); }
+  .lyric-line .cur.fixing, .lyric-line .cur.spelling { -webkit-mask-image: none; mask-image: none; }
+  .lyric-line .nxt { opacity: .75; }
+  .lyric-line .cur.enter { animation: lineIn .25s ease-out; }
+  @keyframes lineIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+
+  /* Small motion */
+  .fade { animation: fadeIn .25s ease-out; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  #posText.pulse { animation: beat .45s ease-out; }
+  @keyframes beat { 0% { color: var(--accent); transform: scale(1.25); } 100% { transform: scale(1); } }
+  @media (prefers-reduced-motion: reduce) {
+    .lyric-line .cur.enter, .fade, #posText.pulse { animation: none; }
+    .lyric-line .cur span { transition: none; }
+  }
+
+  /* Accent colours (the default is teal) */
+  :root[data-accent="blue"] { --accent: #6aa9ff; --accent-ink: #06182e; --band: rgba(106, 169, 255, 0.10); --band-strong: rgba(106, 169, 255, 0.22); }
+  :root[data-accent="violet"] { --accent: #b49cff; --accent-ink: #1a1033; --band: rgba(180, 156, 255, 0.10); --band-strong: rgba(180, 156, 255, 0.22); }
+  :root[data-accent="rose"] { --accent: #f58fb7; --accent-ink: #330a1a; --band: rgba(245, 143, 183, 0.10); --band-strong: rgba(245, 143, 183, 0.22); }
+  @media (prefers-color-scheme: light) {
+    :root[data-accent="blue"] { --accent: #1f5fbf; --accent-ink: #ffffff; --band: rgba(31, 95, 191, 0.09); --band-strong: rgba(31, 95, 191, 0.20); }
+    :root[data-accent="violet"] { --accent: #5a3fc0; --accent-ink: #ffffff; --band: rgba(90, 63, 192, 0.09); --band-strong: rgba(90, 63, 192, 0.20); }
+    :root[data-accent="rose"] { --accent: #b0305f; --accent-ink: #ffffff; --band: rgba(176, 48, 95, 0.09); --band-strong: rgba(176, 48, 95, 0.20); }
+  }
+  .btn.primary { background: var(--accent); color: var(--accent-ink); box-shadow: none; font-weight: 700; }

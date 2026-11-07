@@ -50,7 +50,8 @@
 
   <div class="plot" id="plot">
     <canvas id="cv"></canvas>
-    <div class="empty" id="empty"><p>Press Start listening and sing a note. Your pitch scrolls left; the right edge is now. To practise a part, load a MIDI file.</p></div>
+    <div class="empty" id="empty"><div class="empty-box"><p id="emptyText">Press Start listening and sing a note.</p>
+        <div class="empty-actions"><button class="btn primary" id="emptyLoad" type="button">Load a MIDI file</button><button class="btn" id="emptyEx" type="button">Try an exercise</button><button class="btn primary" id="emptyStart" type="button" hidden>Start exercise</button></div></div></div>
   </div>
 
   <div class="lyric-line" id="lyricLine" hidden aria-label="Lyrics"><div class="cur"></div><div class="nxt"></div><div class="lyric-warn" id="lyricWarn" hidden></div><button class="fix" id="lyricFix" type="button" aria-pressed="false" hidden>Fix lyrics</button><button class="fix" id="lyricSpell" type="button" hidden>Switch to spelling</button></div>
@@ -155,6 +156,14 @@
     <details class="settings">
       <summary>Settings</summary>
       <div class="grid">
+        <label class="field">Accent colour
+          <select id="accent">
+            <option value="teal">Teal</option>
+            <option value="blue">Blue</option>
+            <option value="violet">Violet</option>
+            <option value="rose">Rose</option>
+          </select>
+        </label>
         <label class="field">Audio delay (ms) <input type="number" id="latency" inputmode="numeric" min="0" max="500" step="10" value="0"></label>
         <div class="field wide" id="syncBox">
           <strong>Sync between devices</strong>

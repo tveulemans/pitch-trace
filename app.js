@@ -24,9 +24,9 @@
   var syncReady = false;      // set once the sync settings are loaded
   const state = {
     running: false, a4: 440, windowSec: 12, range: 'auto', sens: 50,
-    speed: 1, countIn: true, guideMine: true, guideOthers: true, octave: 'any', partName: '', agc: false, names: 'letters', staff: 'off', lyrics: true, lyricLane: false, level: 1, latency: 0, loopAuto: false, mode: 'songs', exercise: 'scales', exVar: '', exMode: 'guide', exLen: 8, exLo: 40, exHi: 62,
+    speed: 1, countIn: true, guideMine: true, guideOthers: true, octave: 'any', partName: '', agc: false, names: 'letters', staff: 'off', lyrics: true, lyricLane: false, level: 1, accent: 'teal', latency: 0, loopAuto: false, mode: 'songs', exercise: 'scales', exVar: '', exMode: 'guide', exLen: 8, exLo: 40, exHi: 62,
   };
-  const PERSIST = ['mode', 'a4', 'windowSec', 'range', 'sens', 'speed', 'countIn', 'guideMine', 'guideOthers', 'octave', 'partName', 'agc', 'names', 'staff', 'lyrics', 'lyricLane', 'level', 'latency', 'loopAuto', 'exercise', 'exVar', 'exMode', 'exLen', 'exLo', 'exHi'];
+  const PERSIST = ['mode', 'a4', 'windowSec', 'range', 'sens', 'speed', 'countIn', 'guideMine', 'guideOthers', 'octave', 'partName', 'agc', 'names', 'staff', 'lyrics', 'lyricLane', 'level', 'accent', 'latency', 'loopAuto', 'exercise', 'exVar', 'exMode', 'exLen', 'exLo', 'exHi'];
   try {
     const saved = JSON.parse(localStorage.getItem('pitchtrace.settings') || '{}');
     for (const k of PERSIST) if (saved[k] != null) state[k] = saved[k];
@@ -40,6 +40,8 @@
   state.lyricLane = state.lyricLane === true;
   state.latency = Math.min(500, Math.max(0, Math.round(Number(state.latency)) || 0));
   state.loopAuto = state.loopAuto === true;
+  if (!['teal', 'blue', 'violet', 'rose'].includes(state.accent)) state.accent = 'teal';
+  document.documentElement.dataset.accent = state.accent;
   { const S = [0.5, 0.6, 0.7, 0.85, 1]; if (!S.includes(state.speed)) state.speed = S.reduce((b, v) => (Math.abs(v - state.speed) < Math.abs(b - state.speed) ? v : b), 1); }
   state.level = Math.min(5, Math.max(1, Math.round(Number(state.level)) || 1));
   // The old "Long notes" and "Find the note" exercises are now modes of "Hold the note".
@@ -98,6 +100,9 @@
     col = { grid: g('--grid'), gridStrong: g('--grid-strong'), ink: g('--ink'), muted: g('--muted'), band: g('--band'), bandStrong: g('--band-strong'), accent: g('--accent'), good: g('--good'), warn: g('--warn'), bad: g('--bad'), panel: g('--panel') };
   }
   readColors();
+  const accentSel = $('accent');
+  accentSel.value = state.accent;
+  accentSel.addEventListener('change', () => { state.accent = accentSel.value; document.documentElement.dataset.accent = state.accent; save(); readColors(); draw(); drawProgress(); });
   const mq = window.matchMedia('(prefers-color-scheme: light)');
   (mq.addEventListener ? mq.addEventListener.bind(mq, 'change') : mq.addListener.bind(mq))(() => { readColors(); draw(); });
 
@@ -552,6 +557,7 @@
         return n ? n.end : (L[k + 1] ? L[k + 1].start : e.start + 0.5);
       });
       curEl.classList.toggle('fixing', fixing);
+      curEl.classList.remove('enter'); void curEl.offsetWidth; curEl.classList.add('enter');   // a short fade when the line changes
       L.forEach((e) => {
         const sp = document.createElement('span');
         sp.textContent = e.text + (fixing ? (e.join ? '-' : ' ') : (e.join ? '' : ' '));
@@ -918,10 +924,15 @@
     const raw = tlNow();
     const p = clamp(raw, 0, score.durationSec);
     const b = barAt(p);
-    const txt = tp.playing && raw < tp.pos0
-      ? 'Count-in'
+    const counting = tp.playing && raw < tp.pos0;
+    const beatsLeft = counting && tp.beatSec ? Math.max(1, Math.ceil((tp.pos0 - raw) / tp.beatSec - 1e-6)) : 0;
+    const txt = counting
+      ? 'Count-in' + (beatsLeft ? ' ' + beatsLeft : '')
       : (b ? (b.n >= 1 ? 'Bar ' + b.n : 'Pickup') : 'Bar 1') + ' · ' + fmt(p) + ' / ' + fmt(score.durationSec);
-    if (txt !== lastPosText) { posText.textContent = txt; lastPosText = txt; }
+    if (txt !== lastPosText) {
+      posText.textContent = txt; lastPosText = txt;
+      if (counting) { posText.classList.remove('pulse'); void posText.offsetWidth; posText.classList.add('pulse'); }
+    }
     if (performance.now() - lastSeekInput > 400) seekEl.value = String(p);
   }
 
@@ -964,7 +975,7 @@
     const nb = state.countIn ? (mi.beats < 3 ? mi.beats * 2 : mi.beats) : 0;
     clicks = [];
     for (let k = 0; k < nb; k++) clicks.push({ t: pos0 - (nb - k) * mi.beatSec, accent: k === 0 });
-    tp.pos0 = pos0;
+    tp.pos0 = pos0; tp.beatSec = mi.beatSec;
     tp.basePos = pos0 - nb * mi.beatSec;
     tp.baseWall = wall();
     tp.playing = true;
@@ -1000,7 +1011,15 @@
 
   /* ---------- songs ---------- */
 
-  function updateEmpty() { emptyEl.hidden = !!score || state.running || pts.length > 0; }
+  function updateEmpty() {
+    emptyEl.hidden = !!score || state.running || pts.length > 0;
+    const ex = state.mode === 'exercises';
+    $('emptyText').textContent = ex ? 'Choose an exercise below, then press Start exercise. The notes to sing scroll in from the right.' : 'Press Start listening and sing a note: your pitch scrolls left, and the right edge is now. Or practise a part of your choir repertoire:';
+    $('emptyLoad').hidden = ex; $('emptyEx').hidden = ex; $('emptyStart').hidden = !ex;
+  }
+  $('emptyLoad').addEventListener('click', () => fileIn.click());
+  $('emptyEx').addEventListener('click', () => setMode('exercises'));
+  $('emptyStart').addEventListener('click', () => $('exGo').click());
 
   function buildQueue() {
     queue = [];
@@ -1052,7 +1071,8 @@
       const rec = songs.find((s) => s.id === lsGet('pitchtrace.last'));
       if (song && song.exercise) { if (rec) openSong(rec); else closeSong(true); }
     }
-    applyMode();
+    applyMode(); updateEmpty();
+    for (const el of [exPanelEl, songField, loadBtn]) { if (el.hidden) continue; el.classList.remove('fade'); void el.offsetWidth; el.classList.add('fade'); }
   }
   modeBtns.songs.addEventListener('click', () => setMode('songs'));
   modeBtns.exercises.addEventListener('click', () => setMode('exercises'));
@@ -1281,6 +1301,19 @@
     return a <= 0.5 ? col.good : a <= 1.5 ? col.warn : col.bad;
   }
 
+  /* "This week against last week" for the chosen measure, when there are runs in both. */
+  function weekCompare(list, m, spec) {
+    const now = Date.now(), WEEK = 7 * 864e5;
+    const mean = (xs) => xs.reduce((s, v) => s + v, 0) / xs.length;
+    const cur = list.filter((h) => h.t > now - WEEK).map(spec.get), prev = list.filter((h) => h.t <= now - WEEK && h.t > now - 2 * WEEK).map(spec.get);
+    if (!cur.length || !prev.length) return '';
+    const a = mean(cur), b = mean(prev), d = a - b;
+    const fmtV = (v) => (m === 'found' ? Math.round(v) + '%' : m === 'wobble' ? v.toFixed(2) : fmtSemi(Math.abs(v)));
+    if (m === 'found') return 'this week ' + fmtV(a) + ' found vs ' + fmtV(b) + ' last week (' + (d >= 0 ? '+' : '') + Math.round(d) + ' points)';
+    const better = m === 'bias' ? Math.abs(a) < Math.abs(b) : a < b;
+    return 'this week ' + fmtV(a) + ' vs ' + fmtV(b) + ' last week (' + (Math.abs(d) < 0.05 ? 'about the same' : better ? 'better' : 'worse') + ')';
+  }
+
   function describe(h) {
     const dir = h.bias < -0.1 ? 'mostly low' : h.bias > 0.1 ? 'mostly high' : 'balanced';
     return fmtStamp(h.t) + ' · typically ' + (h.dist == null ? 'not sung' : fmtSemi(h.dist) + ' off') + ' (' + dir + ') · ' + foundAt(h) + '% found within ' + LEVEL_NAMES[state.level - 1] + ' · speed ' + Math.round((h.speed || 1) * 100) + '%' + (h.partial ? ' · partial run' : '');
@@ -1332,6 +1365,11 @@
       c.beginPath(); vals.forEach((v, i) => (i ? c.lineTo(x(i), y(v)) : c.moveTo(x(i), y(v)))); c.stroke();
       c.globalAlpha = 1;
       const avg = scoring.rolling(vals, 5);
+      const grad = c.createLinearGradient(0, T, 0, T + h);
+      grad.addColorStop(0, col.band); grad.addColorStop(1, 'rgba(0,0,0,0)');
+      c.fillStyle = grad; c.beginPath(); c.moveTo(x(0), y(lo));
+      avg.forEach((v, i) => c.lineTo(x(i), y(v)));
+      c.lineTo(x(avg.length - 1), y(lo)); c.closePath(); c.fill();
       c.strokeStyle = col.accent; c.lineWidth = 3;
       c.beginPath(); avg.forEach((v, i) => (i ? c.lineTo(x(i), y(v)) : c.moveTo(x(i), y(v)))); c.stroke();
     }
@@ -1349,6 +1387,8 @@
       text += ' · closest ' + fmtSemi(s.best) + ' · last ' + fmtSemi(s.last) + ' (typical distance from the note)';
       if (s.k >= 2) { const dlt = s.first5 - s.last5; text += ' · first ' + s.k + ' runs averaged ' + fmtSemi(s.first5) + ', last ' + s.k + ' ' + fmtSemi(s.last5) + (Math.abs(dlt) >= 0.05 ? (dlt > 0 ? ': closer by ' : ': further by ') + Math.abs(dlt).toFixed(1) : ''); }
     }
+    const wk = weekCompare(list, m, spec);
+    if (wk) text += ' · ' + wk;
     progSummary.textContent = text;
     progInfo.textContent = progSel >= 0 && list[progSel] ? describe(list[progSel]) : 'Tap a point for the details of that run. The thick line is the average of your last five runs.';
   }

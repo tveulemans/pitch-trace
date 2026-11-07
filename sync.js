@@ -6,7 +6,7 @@
 
   const PATH = 'data.json';
   /* Settings worth sharing. Device-specific ones (audio delay, microphone sensitivity, speed, view window) stay local. */
-  const SYNCED = ['a4', 'range', 'octave', 'names', 'staff', 'lyrics', 'lyricLane', 'level', 'countIn', 'guideMine', 'guideOthers', 'exLo', 'exHi', 'exLen', 'exMode', 'exVar'];
+  const SYNCED = ['a4', 'range', 'octave', 'names', 'staff', 'lyrics', 'lyricLane', 'level', 'accent', 'countIn', 'guideMine', 'guideOthers', 'exLo', 'exHi', 'exLen', 'exMode', 'exVar'];
   const HISTORY_MAX = 600;
 
   function bytesToB64(buf) {
