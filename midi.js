@@ -228,7 +228,7 @@
     if (!(durationSec > 0) || durationSec > MAX_SECONDS) throw new Error('This MIDI file has an unusable length.');
 
     const keys = m.keys.slice().sort((a, b) => a.tick - b.tick);
-    const title = String(fileName || 'Score').replace(/\.(mid|midi|kar)$/i, '').replace(/_/g, ' ').trim() || 'Score';
+    const title = String(fileName || 'Score').replace(/\.(mid|midi|kar|mxl|musicxml|xml|mscz|mscx)$/i, '').replace(/_/g, ' ').trim() || 'Score';
 
     function meterAt(sec) {
       const tick = Math.max(0, tm.secToTick(Math.max(0, sec)));

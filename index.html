@@ -51,7 +51,7 @@
   <div class="plot" id="plot">
     <canvas id="cv"></canvas>
     <div class="empty" id="empty"><div class="empty-box"><p id="emptyText">Press Start listening and sing a note.</p>
-        <div class="empty-actions"><button class="btn primary" id="emptyLoad" type="button">Load a MIDI file</button><button class="btn" id="emptyEx" type="button">Try an exercise</button><button class="btn primary" id="emptyStart" type="button" hidden>Start exercise</button></div></div></div>
+        <div class="empty-actions"><button class="btn primary" id="emptyLoad" type="button">Load a score</button><button class="btn" id="emptyEx" type="button">Try an exercise</button><button class="btn primary" id="emptyStart" type="button" hidden>Start exercise</button></div></div></div>
   </div>
 
   <div class="lyric-line" id="lyricLine" hidden aria-label="Lyrics"><div class="cur"></div><div class="nxt"></div><div class="lyric-warn" id="lyricWarn" hidden></div><button class="fix" id="lyricFix" type="button" aria-pressed="false" hidden>Fix lyrics</button><button class="fix" id="lyricSpell" type="button" hidden>Switch to spelling</button></div>
@@ -98,8 +98,8 @@
 
   <div class="controls">
     <button class="go" id="toggle" type="button" data-on="false">Start listening</button>
-    <button class="btn quiet" id="load" type="button">Load MIDI</button>
-    <input type="file" id="file" accept=".mid,.midi,.kar,audio/midi,audio/x-midi" hidden>
+    <button class="btn quiet" id="load" type="button">Load score</button>
+    <input type="file" id="file" accept=".mid,.midi,.kar,.mxl,.musicxml,.xml,.mscz,.mscx,audio/midi,audio/x-midi" hidden>
     <label class="field" id="songField" hidden>Song
       <select id="song"><option value="">Free tuner (no score)</option></select>
     </label>
@@ -255,7 +255,7 @@
           <input type="checkbox" id="agc">
         </label>
         <button class="btn small" id="removeSong" type="button" hidden>Remove this song</button>
-        <p class="help">Export a MIDI file from MuseScore (File, Export, MIDI) and load it here. Songs stay on this device only; nothing is uploaded. If the song starts with a pickup measure, enter its length in beats so bar numbers match your score. Pitches are sounding pitch in equal temperament. Use headphones with the guide tone, otherwise the microphone hears it too. If quiet notes are missed, press "Set from room noise" while the room is quiet, or raise sensitivity by hand. Lower it if background noise or a humming appliance triggers the trace. "Boost quiet microphones" turns on the phone's automatic gain; it helps with very quiet input but can make the room noise louder between notes.</p>
+        <p class="help">Load a score here: a MuseScore file (.mscz), MusicXML (.musicxml, .mxl) or a MIDI file. MusicXML and MuseScore files give each voice its own lyrics; MIDI exported from MuseScore may carry the soprano's lyrics on every part. Songs stay on this device only; nothing is uploaded. If the song starts with a pickup measure, enter its length in beats so bar numbers match your score. Pitches are sounding pitch in equal temperament. Use headphones with the guide tone, otherwise the microphone hears it too. If quiet notes are missed, press "Set from room noise" while the room is quiet, or raise sensitivity by hand. Lower it if background noise or a humming appliance triggers the trace. "Boost quiet microphones" turns on the phone's automatic gain; it helps with very quiet input but can make the room noise louder between notes.</p>
       </div>
     </details>
   </div>
@@ -267,6 +267,7 @@
 <script src="exercises.js"></script>
 <script src="library.js"></script>
 <script src="sync.js"></script>
+<script src="scoreimport.js"></script>
 <script src="app.js"></script>
 <script>
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {

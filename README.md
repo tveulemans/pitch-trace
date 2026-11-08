@@ -8,10 +8,14 @@ Your voice is detected with the YIN algorithm and drawn as a line against a semi
 
 1. Open the published page (see **Hosting**) in Chrome, Edge, Firefox or Safari.
 2. Press **Start listening** and allow the microphone, then sing. The right edge of the trace is now. This is the free tuner.
-3. To practise a part, press **Load MIDI** and choose a file. Pick your part if the file has several.
+3. To practise a part, press **Load score** and choose a file (MuseScore, MusicXML or MIDI). Pick your part if the file has several.
 4. Press **Play**. A one-bar count-in clicks, then the notes of your part scroll in from the right and the guide tone plays them. Sing along and watch the line.
 
 On a phone, use the browser menu and choose **Add to Home screen** or **Install app**. After the first visit it also works offline.
+
+### Loading a MuseScore or MusicXML file
+
+You can load a MuseScore file (`.mscz`, `.mscx`) or MusicXML (`.musicxml`, `.xml`, compressed `.mxl`) directly. The file is read in your browser and converted to MIDI on the spot, so nothing is uploaded. Compared with a MIDI exported by MuseScore, each voice keeps **its own lyrics**, the tempo and any pickup measure come from the score, voices sharing a staff become separate parts, and repeats are played out (verse 2 is used on the second time through). Grace notes are left out. First and second endings, jumps and codas are followed in MusicXML but not in MuseScore files; export those as MusicXML.
 
 ### Getting a MIDI file from MuseScore
 
@@ -84,6 +88,7 @@ then open `http://localhost:8000`.
 | `index.html` | Page structure |
 | `styles.css` | Styling, light and dark themes |
 | `pitch.js` | YIN pitch detection |
+| `scoreimport.js` | MusicXML and MuseScore reader that writes a MIDI file (voices, lyrics, repeats, tempo) |
 | `midi.js` | MIDI file reader: parts, note times in seconds, bar grid, lyrics |
 | `scoring.js` | Scores a run and summarises runs over time |
 | `exercises.js` | Builds the training exercises as MIDI for your range |

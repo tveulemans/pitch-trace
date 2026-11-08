@@ -1642,12 +1642,24 @@
     const f = fileIn.files && fileIn.files[0];
     fileIn.value = '';
     if (!f) return;
-    if (f.size > 5 * 1024 * 1024) { showMsg('That file is too large to be a MIDI score.'); return; }
+    if (f.size > 20 * 1024 * 1024) { showMsg('That file is too large to be a score.'); return; }
     let bytes;
     try { bytes = await f.arrayBuffer(); } catch (e) { showMsg('That file could not be read.'); return; }
+    // A MIDI file is used as it is. MusicXML and MuseScore files are first turned into MIDI, with every voice keeping its own lyrics.
+    let imported = null;
+    const head = new Uint8Array(bytes, 0, Math.min(4, bytes.byteLength));
+    const isMidi = head.length === 4 && head[0] === 0x4d && head[1] === 0x54 && head[2] === 0x68 && head[3] === 0x64;
+    if (!isMidi) {
+      try {
+        showMsg('Reading the score…');
+        imported = await window.PitchTrace.scoreImport.convert(bytes, f.name);
+        bytes = imported.bytes.buffer.slice(imported.bytes.byteOffset, imported.bytes.byteOffset + imported.bytes.byteLength);
+      } catch (e) { showMsg('That score could not be opened: ' + (e && e.message ? e.message : 'unknown error')); return; }
+    } else if (f.size > 5 * 1024 * 1024) { showMsg('That file is too large to be a MIDI score.'); return; }
     const old = songs.find((s) => s.id === f.name);
-    const rec = { id: f.name, name: f.name, bytes, added: Date.now(), pickup: old ? old.pickup : 0, part: old ? old.part : null };
+    const rec = { id: f.name, name: f.name, bytes, added: Date.now(), pickup: old ? old.pickup : (imported ? imported.pickup : 0), part: old ? old.part : null };
     if (!openSong(rec)) return;
+    if (imported) showMsg(imported.warnings.length ? imported.warnings.join(' ') : '');
     songs = songs.filter((s) => s.id !== rec.id).concat(rec).sort((a, b) => a.name.localeCompare(b.name));
     fillSongs();
     persistSong(rec);
