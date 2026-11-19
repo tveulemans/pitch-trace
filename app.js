@@ -35,7 +35,7 @@
   if (!(state.speed >= 0.25 && state.speed <= 1)) state.speed = 1;
   if (state.octave !== 'exact') state.octave = 'any';
   if (state.names !== 'solfege') state.names = 'letters';
-  if (state.staff !== 'bass') state.staff = 'off';
+  if (state.staff !== 'bass' && state.staff !== 'treble') state.staff = 'off';
   state.lyrics = state.lyrics !== false;
   state.lyricLane = state.lyricLane === true;
   state.latency = Math.min(500, Math.max(0, Math.round(Number(state.latency)) || 0));
@@ -97,7 +97,7 @@
   function readColors() {
     const cs = getComputedStyle(document.documentElement);
     const g = (n) => cs.getPropertyValue(n).trim();
-    col = { grid: g('--grid'), gridStrong: g('--grid-strong'), ink: g('--ink'), muted: g('--muted'), band: g('--band'), bandStrong: g('--band-strong'), accent: g('--accent'), good: g('--good'), warn: g('--warn'), bad: g('--bad'), panel: g('--panel') };
+    col = { grid: g('--grid'), gridStrong: g('--grid-strong'), ink: g('--ink'), muted: g('--muted'), band: g('--band'), bandStrong: g('--band-strong'), accent: g('--accent'), good: g('--good'), warn: g('--warn'), bad: g('--bad'), panel: g('--panel'), staff: g('--staff') || g('--ink') };
   }
   readColors();
   const accentSel = $('accent');
@@ -124,6 +124,7 @@
   const stepOf = (midi) => LETTER[(flats ? FLAT : SHARP)[((midi % 12) + 12) % 12][0]] + 7 * (Math.floor(midi / 12) - 1);
   const naturalMidi = (step) => NATURAL_SEMI[step % 7] + 12 * (Math.floor(step / 7) + 1);
   const BASS_LINES = [43, 47, 50, 53, 57]; // G2 B2 D3 F3 A3
+  const TREBLE_LINES = [64, 67, 71, 74, 77]; // E4 G4 B4 D5 F5
   const fmt = (sec) => { sec = Math.max(0, sec); return Math.floor(sec / 60) + ':' + String(Math.floor(sec % 60)).padStart(2, '0'); };
 
   function setStatus(kind, text) { statusEl.dataset.s = kind; statusText.textContent = text; }
@@ -492,18 +493,22 @@
   const MONO = 'ui-monospace, Menlo, Consolas, monospace';
   const SANS = '"Avenir Next", "Segoe UI", Roboto, system-ui, sans-serif';
 
-  // The five lines of the bass clef (clé de fa) at their true pitch, with a compact clef in the left gutter.
-  function drawBassStaff(c, L, pw, T, ph, yOf) {
+  // The five staff lines at their true pitch (bass or treble clef), in a warm tint, with a compact clef in the left gutter.
+  function drawStaff(c, L, pw, T, ph, yOf) {
+    const treble = state.staff === 'treble', lines = treble ? TREBLE_LINES : BASS_LINES;
+    const yLo = yOf(lines[0]), yHi = yOf(lines[4]);
     c.save();
     c.beginPath(); c.rect(2, T, L + pw - 2, ph); c.clip();
-    c.strokeStyle = col.ink; c.fillStyle = col.ink; c.globalAlpha = 0.55; c.lineWidth = 1.25;
-    for (const m of BASS_LINES) { const y = Math.round(yOf(m)) + 0.5; c.beginPath(); c.moveTo(4, y); c.lineTo(L + pw, y); c.stroke(); }
-    // Hairline barline closing the clef gutter.
-    c.globalAlpha = 0.55; c.beginPath(); c.moveTo(L - 0.5, yOf(57)); c.lineTo(L - 0.5, yOf(43)); c.stroke();
-    const u = Math.min((yOf(43) - yOf(57)) / 4, (L - 14) / 3.1);
-    if (u >= 4) {
+    c.strokeStyle = col.staff; c.fillStyle = col.staff; c.globalAlpha = 0.85;
+    const dw = Math.max(1, Math.round(1.5 * dpr));          // line width in device pixels, so every staff line looks the same
+    c.lineWidth = dw / dpr;
+    for (const m of lines) { const y = (Math.round(yOf(m) * dpr) + (dw % 2 ? 0.5 : 0)) / dpr; c.beginPath(); c.moveTo(4, y); c.lineTo(L + pw, y); c.stroke(); }
+    c.beginPath(); c.moveTo(L - 0.5, yHi); c.lineTo(L - 0.5, yLo); c.stroke();   // hairline closing the clef gutter
+    const sp = (yLo - yHi) / 4;
+    const u = Math.min(sp, (L - 14) / (treble ? 2.2 : 3.1));
+    c.globalAlpha = 0.95; c.lineCap = 'round'; c.lineJoin = 'round'; c.lineWidth = Math.max(1.5, u * 0.3);
+    if (u >= 4 && !treble) {
       const x0 = 8, yF = yOf(53); // the clef curls around the F line
-      c.globalAlpha = 0.9; c.lineCap = 'round'; c.lineWidth = Math.max(1.5, u * 0.3);
       c.beginPath();
       c.moveTo(x0 + 0.35 * u, yF);
       c.bezierCurveTo(x0 + 0.35 * u, yF - 1.5 * u, x0 + 2.0 * u, yF - 1.3 * u, x0 + 1.9 * u, yF + 0.3 * u);
@@ -511,6 +516,21 @@
       c.stroke();
       c.beginPath(); c.arc(x0 + 0.35 * u, yF, 0.36 * u, 0, Math.PI * 2); c.fill();
       for (const m of [55, 51.5]) { c.beginPath(); c.arc(x0 + 2.7 * u, yOf(m), 0.15 * u + 0.5, 0, Math.PI * 2); c.fill(); }
+    } else if (u >= 4) {
+      // The clef winds around the G line: a spine with a loop at the top and a curl below the staff.
+      const x0 = 9, yG = yOf(67);
+      const P = (x, y) => [x0 + x * u, yG + y * u];
+      const bz = (a, b, d) => c.bezierCurveTo(...P(...a), ...P(...b), ...P(...d));
+      c.beginPath();
+      c.moveTo(...P(0.2, 2.4));
+      bz([0.2, 3.0], [1.2, 3.1], [1.2, 2.3]);           // curl at the bottom
+      bz([1.2, 1.2], [0.9, -1.0], [1.0, -2.3]);         // spine going up
+      bz([1.1, -3.4], [1.9, -2.9], [1.7, -2.0]);        // top loop
+      bz([1.4, -1.0], [0.0, -0.6], [0.0, 0.5]);         // sweeping down-left
+      bz([0.0, 1.5], [1.8, 1.7], [1.8, 0.5]);           // belly round the G line
+      bz([1.8, -0.5], [0.5, -0.7], [0.4, 0.3]);         // inner loop
+      c.stroke();
+      c.beginPath(); c.arc(...P(1.2, 2.3), 0.28 * u, 0, Math.PI * 2); c.fill();
     }
     c.restore();
   }
@@ -695,7 +715,7 @@
 
     const hasLyrics = !!(score && state.lyrics && state.lyricLane && lyricsOf().length);
     const laneH = hasLyrics ? 26 : 0;
-    const staffOn = !!score && state.staff === 'bass';
+    const staffOn = !!score && state.staff !== 'off';
     const L = staffOn ? 56 : 44, R = 12, T = score ? 20 : 8, B = 18 + laneH;
     const pw = cssW - L - R, ph = cssH - T - B;
     if (pw < 40 || ph < 40) return;
@@ -774,7 +794,7 @@
       }
     }
 
-    if (staffOn) drawBassStaff(c, L, pw, T, ph, yOf);
+    if (staffOn) drawStaff(c, L, pw, T, ph, yOf);
 
     // Playhead (the right edge in the free tuner).
     c.strokeStyle = col.muted; c.lineWidth = score ? 1.5 : 1;
@@ -797,17 +817,18 @@
         const w = Math.max(2, x2 - x1 - 1);
         const active = n.start <= now && now < n.end;
         const a = active ? 1 : n.end <= now ? 0.35 : 0.75;
-        if (state.staff === 'bass') {
+        if (state.staff !== 'off') {
           // Ledger lines for notes above or below the staff.
           const s = stepOf(n.midi);
           c.save();
-          c.strokeStyle = col.ink; c.globalAlpha = 0.5 * a; c.lineWidth = 1.5;
+          c.strokeStyle = col.staff; c.globalAlpha = 0.7 * a; c.lineWidth = 1.5;
           const ledger = (k) => { const ly = yOf(naturalMidi(k)); c.beginPath(); c.moveTo(x1 - 5, ly); c.lineTo(x1 + w + 5, ly); c.stroke(); };
-          if (s >= 28) for (let k = 28; k <= s; k += 2) ledger(k);
-          else if (s <= 16) for (let k = 16; k >= s; k -= 2) ledger(k);
+          const treble = state.staff === 'treble', top = treble ? 40 : 28, bot = treble ? 28 : 16;   // first ledger line above / below
+          if (s >= top) for (let k = top; k <= s; k += 2) ledger(k);
+          else if (s <= bot) for (let k = bot; k >= s; k -= 2) ledger(k);
           c.restore();
         }
-        if (state.staff === 'bass') {
+        if (state.staff !== 'off') {
           const pc = ((n.midi % 12) + 12) % 12;
           if (NATURAL_LABEL[pc] === '') {
             const k = notes.indexOf(n), pv = k > 0 ? notes[k - 1] : null;
