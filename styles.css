@@ -117,7 +117,6 @@
   .lyric-line .nxt { font-size: clamp(13px, 3.6vw, 16px); min-height: 1.25em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
   .lyric-line .cur.fixing span { cursor: pointer; border-bottom: 1px dotted var(--muted); }
   .lyric-line .cur.fixing { text-overflow: clip; }
-  .lyric-line .lyric-warn { font-size: 12px; color: var(--warn); }
   .lyric-line .fix { appearance: none; border: 0; background: transparent; color: var(--muted); font-size: 12px; text-decoration: underline; cursor: pointer; padding: 6px 0; }
   .lyric-line .fix[aria-pressed="true"] { color: var(--accent); font-weight: 700; }
   .result { border: 1px solid var(--grid-strong); border-radius: 10px; background: var(--panel); padding: 10px 12px; display: grid; gap: 4px; font-size: 14px; }
@@ -161,7 +160,16 @@
   #exPanel.pinned summary { display: none; }
   #exPanel.pinned .grid { padding-top: 0; }
   #exPanel[hidden] { display: none; }
-  .lyric-line .lyric-warn { font-size: 13px; padding: 2px 0; }
+  .lyric-line .tick { font-size: clamp(17px, 4.8vw, 24px); font-weight: 600; line-height: 1.4; overflow: hidden; text-align: left; white-space: nowrap;
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 14%, #000 80%, transparent); mask-image: linear-gradient(90deg, transparent, #000 14%, #000 80%, transparent); }
+  .lyric-line .tick .track { display: inline-block; position: relative; white-space: nowrap; transition: transform .22s ease-out; }
+  .lyric-line .tick span { display: inline-block; position: relative; white-space: pre; color: var(--ink); border-bottom: 2px solid transparent; transition: color .15s, border-color .15s; }
+  .lyric-line .tick span.past { color: var(--muted); }
+  .lyric-line .tick span.next { border-bottom-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+  .lyric-line .tick span.now { border-bottom-color: var(--accent); }
+  .lyric-line .tick span.now::after { content: attr(data-t); position: absolute; left: 0; top: 0; width: calc(var(--p, 0) * 100%); overflow: hidden; white-space: pre; color: var(--accent); }
+  .lyric-line .fix + .fix, .lyric-line .fix + .lyric-chip { margin-left: 12px; }
+  .lyric-line .lyric-chip { appearance: none; font: inherit; font-size: 11px; line-height: 1.5; padding: 0 8px; border-radius: 999px; border: 1px solid var(--warn); background: var(--panel); color: var(--warn); cursor: pointer; }
   .readout { min-height: 77px; }
   .readout[data-q="idle"] .cents, .readout[data-q="idle"] .hz { display: none; }
   .readout[data-q="idle"] .verdict { font-size: 15px; }

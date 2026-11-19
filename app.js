@@ -546,6 +546,7 @@
      MIDI has no line breaks, so a new line starts after a rest, after a "/" marker, after sentence punctuation, or when the line gets long. */
   let run = null;
   let linesFor = null, lines = [], lineIdx = -2, sylIdx = -2, lineSpans = [], lineData = [], lineEnds = [], sylOn = false, fixing = false, spelling = false;
+  let tickBuilt = false, tickSpans = [], tickEnds = [], tickSi = -2, tickOn = false;
 
   function buildLines(ly) {
     const notes = score.parts[partIdx].notes;
@@ -567,7 +568,10 @@
     fixBtn.hidden = !(song && !song.exercise);
     if (!ly.length) { if (!lineEl.hidden) { lineEl.hidden = true; linesFor = null; } return; }
     lineEl.hidden = false;
-    if (linesFor !== ly) { linesFor = ly; lines = buildLines(ly); lineIdx = -2; sylIdx = -2; }
+    if (linesFor !== ly) { linesFor = ly; lines = buildLines(ly); lineIdx = -2; sylIdx = -2; tickBuilt = false; }
+    const curEl = lineEl.querySelector('.cur'), tickEl = lineEl.querySelector('.tick');
+    curEl.hidden = !fixing; tickEl.hidden = fixing;
+    if (!fixing) { updateTicker(now, ly, tickEl); return; }
     // The current line: the last one that has started (a little early, so the next line is ready during a rest).
     let li = 0;
     for (let k = 0; k < lines.length; k++) { if (lines[k][0].start - 0.6 <= now) li = k; else break; }
@@ -576,7 +580,6 @@
     for (let k = 0; k < L.length; k++) { if (L[k].start <= now) si = k; else break; }
     if (li !== lineIdx) {
       lineIdx = li; sylIdx = -2;
-      const curEl = lineEl.querySelector('.cur'), nxtEl = lineEl.querySelector('.nxt');
       curEl.textContent = ''; lineSpans = [];
       lineData = L; sylOn = false;
       // When each syllable stops sounding: the end of the note it sits on, or the next syllable if there is no note.
@@ -592,7 +595,6 @@
         sp.textContent = e.text + (fixing ? (e.join ? '-' : ' ') : (e.join ? '' : ' '));
         curEl.append(sp); lineSpans.push(sp);
       });
-      nxtEl.textContent = lines[li + 1] ? lines[li + 1].map((e) => e.text + (e.join ? '' : ' ')).join('') : '';
     }
     const on = si >= 0 && now < lineEnds[si];     // the highlight goes out as soon as the note ends
     if (si !== sylIdx || on !== sylOn) {
@@ -601,8 +603,48 @@
     }
   }
 
+  /* The one-line lyric ticker: every syllable of the song sits on one strip that slides so the current syllable stays at a fixed
+     spot (30% from the left). The sung part fills in step with the note; sung syllables dim; the next one is underlined. */
+  function updateTicker(now, ly, tickEl) {
+    const track = tickEl.firstElementChild;
+    if (!tickBuilt) {
+      track.textContent = ''; tickSpans = []; tickSi = -2;
+      const pn = score.parts[partIdx].notes;
+      tickEnds = ly.map((e, k) => {
+        const n = pn.find((x) => Math.abs(x.start - e.start) < 0.06);
+        return n ? n.end : (ly[k + 1] ? ly[k + 1].start : e.start + 0.5);
+      });
+      ly.forEach((e, k) => {
+        const sp = document.createElement('span'), t = e.text + (e.join ? '' : ' ');
+        sp.textContent = t; sp.dataset.t = t;
+        if (k && e.newline) sp.style.marginLeft = '0.9em';
+        track.append(sp); tickSpans.push(sp);
+      });
+      tickBuilt = true;
+    }
+    let lo = 0, hi = ly.length - 1, si = -1;
+    while (lo <= hi) { const mid = (lo + hi) >> 1; if (ly[mid].start <= now) { si = mid; lo = mid + 1; } else hi = mid - 1; }
+    const on = si >= 0 && now < tickEnds[si];     // the highlight goes out as soon as the note ends
+    if (si !== tickSi || on !== tickOn) {
+      const jump = Math.abs(si - tickSi) > 2;
+      for (let k = 0; k < tickSpans.length; k++) {
+        tickSpans[k].className = k < si || (k === si && !on) ? 'past' : k === si ? 'now' : k === si + 1 ? 'next' : '';
+      }
+      const target = tickSpans[Math.max(si, 0)];
+      if (jump) track.style.transition = 'none';
+      track.style.transform = 'translateX(' + Math.round(tickEl.clientWidth * 0.3 - target.offsetLeft) + 'px)';
+      if (jump) { void track.offsetWidth; track.style.transition = ''; }
+      tickSi = si; tickOn = on;
+    }
+    if (on) {
+      const d = Math.max(0.05, tickEnds[si] - ly[si].start);
+      tickSpans[si].style.setProperty('--p', Math.min(1, Math.max(0, (now - ly[si].start) / d)).toFixed(3));
+    }
+  }
+
   /* Fixing word breaks: in this mode every syllable shows its hyphen (joined to the next) or a space; tapping one flips it.
      The fixes are kept with the song, keyed by the syllable's position in its track. */
+  lyricWarn.addEventListener('click', () => { showMsg(msgEl.hidden || msgEl.textContent !== lyricWarn.dataset.msg ? lyricWarn.dataset.msg : ''); });
   fixBtn.addEventListener('click', () => {
     fixing = !fixing;
     fixBtn.textContent = fixing ? 'Done' : 'Fix lyrics';
@@ -1146,7 +1188,7 @@
     else {
       const n = lyricNotice();
       if (n.info && !n.warn) rangeInfo.append(' \u00b7 ' + n.info);   // a warning is shown once, under the lyrics
-      lyricWarn.textContent = n.warn; lyricWarn.hidden = !n.warn;
+      lyricWarn.dataset.msg = n.warn; lyricWarn.title = n.warn; lyricWarn.hidden = !n.warn;
     }
     if (song && !song.exercise) { state.exLo = clamp(p.lo, 28, 84); state.exHi = clamp(p.hi, 28, 84); save(); fillExRange(); }
   }
