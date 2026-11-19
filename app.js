@@ -24,9 +24,9 @@
   var syncReady = false;      // set once the sync settings are loaded
   const state = {
     running: false, a4: 440, windowSec: 12, range: 'auto', sens: 50,
-    speed: 1, countIn: true, guideMine: true, guideOthers: true, octave: 'any', partName: '', agc: false, names: 'letters', staff: 'off', lyrics: true, lyricLane: false, level: 1, accent: 'teal', latency: 0, loopAuto: false, mode: 'songs', exercise: 'scales', exVar: '', exMode: 'guide', exLen: 8, exLo: 40, exHi: 62,
+    speed: 1, countIn: true, guideMine: true, guideOthers: true, octave: 'any', partName: '', agc: false, names: 'letters', octNum: true, staff: 'off', lyrics: true, lyricLane: false, level: 1, accent: 'teal', latency: 0, loopAuto: false, mode: 'songs', exercise: 'scales', exVar: '', exMode: 'guide', exLen: 8, exLo: 40, exHi: 62,
   };
-  const PERSIST = ['mode', 'a4', 'windowSec', 'range', 'sens', 'speed', 'countIn', 'guideMine', 'guideOthers', 'octave', 'partName', 'agc', 'names', 'staff', 'lyrics', 'lyricLane', 'level', 'accent', 'latency', 'loopAuto', 'exercise', 'exVar', 'exMode', 'exLen', 'exLo', 'exHi'];
+  const PERSIST = ['mode', 'a4', 'windowSec', 'range', 'sens', 'speed', 'countIn', 'guideMine', 'guideOthers', 'octave', 'partName', 'agc', 'names', 'octNum', 'staff', 'lyrics', 'lyricLane', 'level', 'accent', 'latency', 'loopAuto', 'exercise', 'exVar', 'exMode', 'exLen', 'exLo', 'exHi'];
   try {
     const saved = JSON.parse(localStorage.getItem('pitchtrace.settings') || '{}');
     for (const k of PERSIST) if (saved[k] != null) state[k] = saved[k];
@@ -82,9 +82,9 @@
   const partField = $('partField'), partSel = $('part'), scoreRangeOpt = $('scoreRange');
   const octSel = $('octave'), countInCb = $('countIn'), mineCb = $('guideMine'), othersCb = $('guideOthers');
   const othersField = $('othersField'), pickupField = $('pickupField'), pickupIn = $('pickup'), tempoField = $('tempoField'), tempoIn = $('tempoPct'), tempoNote = $('tempoNote'), lyricWarn = $('lyricWarn'), removeBtn = $('removeSong');
-  const agcCb = $('agc'), calibBtn = $('calibrate'), calibNote = $('calibNote'), rangeInfo = $('rangeInfo'), namesSel = $('names'), staffSel = $('staff'), lyricsCb = $('lyrics'), laneCb = $('lyricLane'), lineEl = $('lyricLine'), fixBtn = $('lyricFix'), spellBtn = $('lyricSpell');
+  const agcCb = $('agc'), calibBtn = $('calibrate'), calibNote = $('calibNote'), rangeInfo = $('rangeInfo'), namesSel = $('names'), octCb = $('octNum'), staffSel = $('staff'), lyricsCb = $('lyrics'), laneCb = $('lyricLane'), lineEl = $('lyricLine'), fixBtn = $('lyricFix'), spellBtn = $('lyricSpell');
   agcCb.checked = !!state.agc;
-  namesSel.value = state.names;
+  namesSel.value = state.names; octCb.checked = state.octNum;
   staffSel.value = state.staff;
   lyricsCb.checked = state.lyrics; laneCb.checked = state.lyricLane;
 
@@ -114,9 +114,9 @@
   const qOf = (cents) => { const a = Math.abs(cents); return a <= GOOD ? 'good' : a <= CLOSE ? 'warn' : 'bad'; };
   const fold = (x) => x - 12 * Math.round(x / 12);
   let flats = false;
-  const noteName = (midi) => {
+  const noteName = (midi, keepOctave) => {
     const table = state.names === 'solfege' ? (flats ? SOL_FLAT : SOL_SHARP) : (flats ? FLAT : SHARP);
-    return table[((midi % 12) + 12) % 12] + (Math.floor(midi / 12) - 1);
+    return table[((midi % 12) + 12) % 12] + (state.octNum || keepOctave ? Math.floor(midi / 12) - 1 : '');
   };
   // Position of a note on the staff, counted in letter steps (C4 = 28, so each step is a line or a space).
   const LETTER = { C: 0, D: 1, E: 2, F: 3, G: 4, A: 5, B: 6 };
@@ -751,7 +751,7 @@
         c.lineWidth = pc === 0 ? 1.5 : 1;
         c.beginPath(); c.moveTo(L, y); c.lineTo(L + pw, y); c.stroke();
       }
-      if (nat && !staffOn) labels.push({ y, pc, text: (state.names === 'solfege' ? SOL_NATURAL : NATURAL_LABEL)[pc] + (Math.floor(m / 12) - 1) });
+      if (nat && !staffOn) labels.push({ y, pc, text: (state.names === 'solfege' ? SOL_NATURAL : NATURAL_LABEL)[pc] + (state.octNum ? Math.floor(m / 12) - 1 : '') });
     }
     // On a short plot some labels would collide: the octave markers (C or Do) always stay, the rest fill the gaps.
     const shown = labels.filter((l) => l.pc === 0);
@@ -1134,7 +1134,7 @@
     const size = !span ? 'a single note' : [oct ? plural(oct, 'octave') : '', rem ? plural(rem, 'semitone') : ''].filter(Boolean).join(' and ');
     rangeInfo.textContent = '';
     const b = (t) => { const e = document.createElement('b'); e.textContent = t; return e; };
-    rangeInfo.append(p.name + ': lowest ', b(noteName(p.lo)), ', highest ', b(noteName(p.hi)), ' (' + size + ')');
+    rangeInfo.append(p.name + ': lowest ', b(noteName(p.lo, true)), ', highest ', b(noteName(p.hi, true)), ' (' + size + ')');
     if (song && song.exercise) { rangeInfo.append(' \u00b7 ' + (song.help || '')); lyricWarn.hidden = true; }
     else {
       const n = lyricNotice();
@@ -1514,7 +1514,7 @@
   function fillExRange() {
     for (const [sel, val] of [[exLo, state.exLo], [exHi, state.exHi]]) {
       sel.innerHTML = '';
-      for (let m = 28; m <= 84; m++) sel.add(new Option(noteName(m), String(m)));
+      for (let m = 28; m <= 84; m++) sel.add(new Option(noteName(m, true), String(m)));
       sel.value = String(val);
     }
     exNote.textContent = '';
@@ -1533,7 +1533,7 @@
     const rec = { id: 'exercise', exId: state.exercise === 'single' ? 'hold:' + state.exMode : (ex.variantId || state.exercise), help: ex.help, lo: ex.lo, hi: ex.hi, name: ex.name, bytes: ex.bytes.buffer, added: Date.now(), pickup: 0, part: ex.partIndex || 0, exercise: true, callResponse: !!ex.callResponse };
     if (!openSong(rec)) return;
     exNote.textContent = ex.widened
-      ? 'Your range is narrower than this exercise, so it goes up to ' + noteName(ex.hi) + '.'
+      ? 'Your range is narrower than this exercise, so it goes up to ' + noteName(ex.hi, true) + '.'
       : ex.callResponse ? 'Listen to each note, then sing it from memory. Press Play.' : 'Starts in the middle of your range, climbs, descends, and comes back. Press Play.';
     play();
   });
@@ -1606,6 +1606,7 @@
   lyricsCb.addEventListener('change', () => { state.lyrics = lyricsCb.checked; save(); draw(); });
   laneCb.addEventListener('change', () => { state.lyricLane = laneCb.checked; save(); draw(); });
   staffSel.addEventListener('change', () => { state.staff = staffSel.value; save(); draw(); });
+  octCb.addEventListener('change', () => { state.octNum = octCb.checked; save(); if (score) updateRangeInfo(); if (lastVoiced) showNote(lastVoiced.m, null); draw(); });
   namesSel.addEventListener('change', () => {
     state.names = namesSel.value;
     save();

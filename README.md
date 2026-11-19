@@ -50,6 +50,7 @@ If a word break is wrong (a hyphen between two different words, or a missing one
 | Part | Which track is yours. The others can be heard as a backing, quieter. |
 | Count-in | One bar of clicks before playback starts. |
 | Note names | Letters (C D E) or fixed-do solfège (Do Re Mi), everywhere in the app. Do is always C, and octave numbers follow the usual scientific numbering, so middle C is Do4. |
+| Show octave number | On by default (Mi3). Turn it off to show just the name (Mi) on the plot, the note bars and the big readout. Voice ranges and the exercise range pickers always keep the number. Synced between devices. |
 | Staff overlay | Off, bass clef (clé de fa) or treble clef (clé de sol). Shows the part like real notation: only the five staff lines of that clef, in a warm tint so they stand apart from the note bars, with a compact clef in its own gutter, ledger lines for notes above or below, and a ♯ or ♭ before notes that need one. The semitone grid is hidden while it is on. Notes stay at their true pitch. |
 | Focus mode | The corner button on the plot hides everything except the plot, lyrics and Play controls (and goes full screen where supported). Press Esc or the button again to leave. |
 | Show lyrics | Shows the line being sung in large type under the grid, with the current syllable highlighted and the next line dimmed. Lines break after rests and sentence ends. Needs lyrics inside the MIDI file (see below). |
