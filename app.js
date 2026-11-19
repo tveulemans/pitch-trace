@@ -500,43 +500,6 @@
   const MONO = 'ui-monospace, Menlo, Consolas, monospace';
   const SANS = '"Avenir Next", "Segoe UI", Roboto, system-ui, sans-serif';
 
-  // A small clef in the left gutter, anchored to the staff it belongs to (the curl of the bass clef sits on the F line, the
-  // treble clef winds around the G line), so the five emphasised lines can be read as a staff.
-  function drawClef(c, T, ph, yOf, x0) {
-    const treble = state.staff === 'treble', lines = treble ? TREBLE_LINES : BASS_LINES;
-    const sp = (yOf(lines[0]) - yOf(lines[4])) / 4;
-    const u = Math.min(sp * 0.7, treble ? 8 : 6.3);
-    c.save();
-    c.beginPath(); c.rect(0, T, x0 + 30, ph); c.clip();
-    c.strokeStyle = col.staff; c.fillStyle = col.staff;
-    c.globalAlpha = 0.95; c.lineCap = 'round'; c.lineJoin = 'round'; c.lineWidth = Math.max(1.4, u * 0.3);
-    if (u >= 3 && !treble) {
-      const yF = yOf(53); // the clef curls around the F line
-      c.beginPath();
-      c.moveTo(x0 + 0.35 * u, yF);
-      c.bezierCurveTo(x0 + 0.35 * u, yF - 1.5 * u, x0 + 2.0 * u, yF - 1.3 * u, x0 + 1.9 * u, yF + 0.3 * u);
-      c.bezierCurveTo(x0 + 1.8 * u, yF + 1.6 * u, x0 + 1.0 * u, yF + 2.4 * u, x0 + 0.2 * u, yF + 3.0 * u);
-      c.stroke();
-      c.beginPath(); c.arc(x0 + 0.35 * u, yF, 0.36 * u, 0, Math.PI * 2); c.fill();
-    } else if (u >= 3) {
-      // The clef winds around the G line: a spine with a loop at the top and a curl below the staff.
-      const yG = yOf(67);
-      const P = (x, y) => [x0 + x * u, yG + y * u];
-      const bz = (a, b, d) => c.bezierCurveTo(...P(...a), ...P(...b), ...P(...d));
-      c.beginPath();
-      c.moveTo(...P(0.2, 2.4));
-      bz([0.2, 3.0], [1.2, 3.1], [1.2, 2.3]);           // curl at the bottom
-      bz([1.2, 1.2], [0.9, -1.0], [1.0, -2.3]);         // spine going up
-      bz([1.1, -3.4], [1.9, -2.9], [1.7, -2.0]);        // top loop
-      bz([1.4, -1.0], [0.0, -0.6], [0.0, 0.5]);         // sweeping down-left
-      bz([0.0, 1.5], [1.8, 1.7], [1.8, 0.5]);           // belly round the G line
-      bz([1.8, -0.5], [0.5, -0.7], [0.4, 0.3]);         // inner loop
-      c.stroke();
-      c.beginPath(); c.arc(...P(1.2, 2.3), 0.28 * u, 0, Math.PI * 2); c.fill();
-    }
-    c.restore();
-  }
-
   /* The line being sung, in large type above the controls: the current syllable is highlighted, the next line is dimmed.
      MIDI has no line breaks, so a new line starts after a rest, after a "/" marker, after sentence punctuation, or when the line gets long. */
   let run = null;
@@ -761,7 +724,7 @@
     const laneH = hasLyrics ? 26 : 0;
     const clefOn = !!score && state.staff !== 'off';
     const staffSet = clefOn ? new Set(state.staff === 'treble' ? TREBLE_LINES : BASS_LINES) : null;
-    const L = clefOn ? 54 : 44, R = 12, T = score ? 20 : 8, B = 18 + laneH;
+    const L = 44, R = 12, T = score ? 20 : 8, B = 18 + laneH;
     const pw = cssW - L - R, ph = cssH - T - B;
     if (pw < 40 || ph < 40) return;
     const phx = score ? L + pw * PLAYHEAD : L + pw;
@@ -848,8 +811,6 @@
         c.fillText('−' + a + 's', x, cssH - 5);
       }
     }
-
-    if (clefOn) drawClef(c, T, ph, yOf, 5);
 
     // Playhead (the right edge in the free tuner).
     c.strokeStyle = col.muted; c.lineWidth = score ? 1.5 : 1;

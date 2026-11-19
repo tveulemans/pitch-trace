@@ -237,6 +237,6 @@
   .focus-btn { position: absolute; top: 6px; right: 6px; z-index: 2; width: 34px; height: 34px; display: grid; place-items: center; padding: 0; border-radius: 8px; border: 1px solid var(--grid); background: color-mix(in srgb, var(--panel) 85%, transparent); color: var(--muted); cursor: pointer; }
   .focus-btn:hover, .focus-btn[aria-pressed="true"] { color: var(--ink); border-color: var(--grid-strong); }
   body.focus .top, body.focus .modes, body.focus .readout, body.focus .meter, body.focus .controls,
-  body.focus .range-info, body.focus #syncBox { display: none !important; }
+  body.focus .range-info, body.focus #loopRow, body.focus #syncBox { display: none !important; }
   body.focus .app { padding-block: 8px; gap: 8px; }
   body.focus .app > .plot { min-height: 0; }
