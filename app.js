@@ -821,18 +821,20 @@
         if (b.endSec < tL) continue;
         if (b.sec > tR) break;
         const len = b.endSec - b.sec;
-        if (pxs * len / b.beats > 22) {
-          c.strokeStyle = col.grid;
+        if (pxs * len / b.beats > 22) {           // beats: whisper-quiet, so the bar lines carry the structure
+          c.strokeStyle = col.grid; c.globalAlpha = 0.45; c.setLineDash([1, 5]);
           for (let j = 1; j < b.beats; j++) {
             const bx = xOf(b.sec + (len * j) / b.beats);
             if (bx >= L && bx <= L + pw) { c.beginPath(); c.moveTo(bx, T); c.lineTo(bx, T + ph); c.stroke(); }
           }
+          c.setLineDash([]); c.globalAlpha = 1;
         }
         const x = xOf(b.sec);
         if (x >= L && x <= L + pw) {
-          c.strokeStyle = col.gridStrong;
-          c.beginPath(); c.moveTo(x, T - 5); c.lineTo(x, T + ph); c.stroke();
-          if (b.n >= 1) { c.fillStyle = col.muted; c.fillText(String(b.n), x + 4, T - 7); }
+          const here = b.sec <= now && now < b.endSec;       // the bar being sung is picked out
+          c.strokeStyle = here ? col.muted : col.gridStrong; c.lineWidth = 1.5;
+          c.beginPath(); c.moveTo(x, T - 5); c.lineTo(x, T + ph); c.stroke(); c.lineWidth = 1;
+          if (b.n >= 1) { c.font = (here ? '700 ' : '') + '11px ' + MONO; c.fillStyle = here ? col.ink : col.muted; c.fillText(String(b.n), x + 4, T - 7); c.font = '10px ' + MONO; }
         }
       }
     } else {
@@ -870,33 +872,38 @@
         const x1 = xOf(n.start), x2 = xOf(n.end), y = yOf(n.midi);
         const w = Math.max(2, x2 - x1 - 1);
         const active = n.start <= now && now < n.end;
-        const a = active ? 1 : n.end <= now ? 0.35 : 0.75;
-        roundRect(c, x1, y - h / 2, w, h, 4);
-        c.globalAlpha = active ? 0.5 : 0.22 * a;
+        const passed = n.end <= now;
+        const vf = n.vel ? 0.78 + 0.22 * clamp((n.vel - 50) / 60, 0, 1) : 1;   // a softer note is a touch fainter
+        const a = active ? 1 : passed ? 0.28 : 0.8 * vf;
+        roundRect(c, x1, y - h / 2, w, h, h / 2.6);
+        c.globalAlpha = active ? 0.6 : passed ? 0.08 : 0.2 * vf;
         c.fillStyle = tone; c.fill();
         c.globalAlpha = a;
-        c.strokeStyle = tone; c.lineWidth = active ? 2 : 1.25; c.stroke();
-        if (active && glow > 0) {            // a soft green halo while you are on the note
+        c.strokeStyle = tone; c.lineWidth = active ? 1.75 : 1; c.stroke();
+        if (active && glow > 0) {            // a soft halo while you are on the note
           c.save();
-          c.shadowColor = col.good; c.shadowBlur = 20 * glow; c.globalAlpha = glow; c.strokeStyle = col.good; c.lineWidth = 3;
-          roundRect(c, x1, y - h / 2, w, h, 4); c.stroke(); c.stroke();
+          c.shadowColor = col.good; c.shadowBlur = 9 * glow; c.globalAlpha = 0.8 * glow; c.strokeStyle = col.good; c.lineWidth = 2;
+          roundRect(c, x1, y - h / 2, w, h, h / 2.6); c.stroke();
           c.restore();
         }
         const label = noteName(n.midi);
-        if (w > label.length * 6.2 + 10) { c.fillStyle = col.ink; c.fillText(label, x1 + 5, y + 0.5); }
+        if (!passed && w > label.length * 6.2 + 10) { c.globalAlpha = active ? 1 : 0.9; c.fillStyle = col.ink; c.fillText(label, x1 + 5, y + 0.5); }
       }
       c.globalAlpha = 1;
     }
 
     // Pitch trace, colored by distance from the target (or from the nearest semitone in the free tuner).
-    c.lineCap = 'round'; c.lineJoin = 'round'; c.lineWidth = 3.5;
+    c.lineCap = 'round'; c.lineJoin = 'round';
     let prev = null;
     for (const p of pts) {
       if (p.m == null) { prev = null; continue; }
       if (prev && p.t - prev.t < 0.15) {
         const x2 = xOf(p.t);
         if (x2 >= L) {
-          c.globalAlpha = 0.25 + 0.75 * clamp((x2 - L) / Math.max(1, phx - L), 0, 1);
+          const age = clamp((x2 - L) / Math.max(1, phx - L), 0, 1);
+          const slope = Math.abs(p.m - prev.m) / Math.max(0.01, p.t - prev.t);    // semitones per second
+          c.globalAlpha = 0.06 + 0.94 * age * age;                                  // the tail fades out smoothly
+          c.lineWidth = 3.8 - 2 * clamp((slope - 3) / 20, 0, 1);                    // thinner on fast glides, full when held
           c.strokeStyle = colorForE(p.e);
           c.beginPath(); c.moveTo(xOf(prev.t), yOf(prev.m)); c.lineTo(x2, yOf(p.m)); c.stroke();
         }
