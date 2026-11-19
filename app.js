@@ -500,22 +500,18 @@
   const MONO = 'ui-monospace, Menlo, Consolas, monospace';
   const SANS = '"Avenir Next", "Segoe UI", Roboto, system-ui, sans-serif';
 
-  // The five staff lines at their true pitch (bass or treble clef), in a warm tint, with a compact clef in the left gutter.
-  function drawStaff(c, L, pw, T, ph, yOf) {
+  // A small clef in the left gutter, anchored to the staff it belongs to (the curl of the bass clef sits on the F line, the
+  // treble clef winds around the G line), so the five emphasised lines can be read as a staff.
+  function drawClef(c, T, ph, yOf, x0) {
     const treble = state.staff === 'treble', lines = treble ? TREBLE_LINES : BASS_LINES;
-    const yLo = yOf(lines[0]), yHi = yOf(lines[4]);
+    const sp = (yOf(lines[0]) - yOf(lines[4])) / 4;
+    const u = Math.min(sp * 0.7, treble ? 8 : 6.3);
     c.save();
-    c.beginPath(); c.rect(2, T, L + pw - 2, ph); c.clip();
-    c.strokeStyle = col.staff; c.fillStyle = col.staff; c.globalAlpha = 0.6;
-    const dw = Math.max(1, Math.round(1.5 * dpr));          // line width in device pixels, so every staff line looks the same
-    c.lineWidth = dw / dpr;
-    for (const m of lines) { const y = (Math.round(yOf(m) * dpr) + (dw % 2 ? 0.5 : 0)) / dpr; c.beginPath(); c.moveTo(4, y); c.lineTo(L + pw, y); c.stroke(); }
-    c.beginPath(); c.moveTo(L - 0.5, yHi); c.lineTo(L - 0.5, yLo); c.stroke();   // hairline closing the clef gutter
-    const sp = (yLo - yHi) / 4;
-    const u = Math.min(sp, (L - 14) / (treble ? 2.2 : 3.1));
-    c.globalAlpha = 0.85; c.lineCap = 'round'; c.lineJoin = 'round'; c.lineWidth = Math.max(1.5, u * 0.3);
-    if (u >= 4 && !treble) {
-      const x0 = 8, yF = yOf(53); // the clef curls around the F line
+    c.beginPath(); c.rect(0, T, x0 + 30, ph); c.clip();
+    c.strokeStyle = col.staff; c.fillStyle = col.staff;
+    c.globalAlpha = 0.95; c.lineCap = 'round'; c.lineJoin = 'round'; c.lineWidth = Math.max(1.4, u * 0.3);
+    if (u >= 3 && !treble) {
+      const yF = yOf(53); // the clef curls around the F line
       c.beginPath();
       c.moveTo(x0 + 0.35 * u, yF);
       c.bezierCurveTo(x0 + 0.35 * u, yF - 1.5 * u, x0 + 2.0 * u, yF - 1.3 * u, x0 + 1.9 * u, yF + 0.3 * u);
@@ -523,9 +519,9 @@
       c.stroke();
       c.beginPath(); c.arc(x0 + 0.35 * u, yF, 0.36 * u, 0, Math.PI * 2); c.fill();
       for (const m of [55, 51.5]) { c.beginPath(); c.arc(x0 + 2.7 * u, yOf(m), 0.15 * u + 0.5, 0, Math.PI * 2); c.fill(); }
-    } else if (u >= 4) {
+    } else if (u >= 3) {
       // The clef winds around the G line: a spine with a loop at the top and a curl below the staff.
-      const x0 = 9, yG = yOf(67);
+      const yG = yOf(67);
       const P = (x, y) => [x0 + x * u, yG + y * u];
       const bz = (a, b, d) => c.bezierCurveTo(...P(...a), ...P(...b), ...P(...d));
       c.beginPath();
@@ -764,8 +760,9 @@
 
     const hasLyrics = !!(score && state.lyrics && state.lyricLane && lyricsOf().length);
     const laneH = hasLyrics ? 26 : 0;
-    const staffOn = !!score && state.staff !== 'off';
-    const L = staffOn ? 56 : 44, R = 12, T = score ? 20 : 8, B = 18 + laneH;
+    const clefOn = !!score && state.staff !== 'off';
+    const staffSet = clefOn ? new Set(state.staff === 'treble' ? TREBLE_LINES : BASS_LINES) : null;
+    const L = clefOn ? 62 : 44, R = 12, T = score ? 20 : 8, B = 18 + laneH;
     const pw = cssW - L - R, ph = cssH - T - B;
     if (pw < 40 || ph < 40) return;
     const phx = score ? L + pw * PLAYHEAD : L + pw;
@@ -795,17 +792,25 @@
       const pc = ((m % 12) + 12) % 12;
       const y = yOf(m);
       const nat = NATURAL_LABEL[pc] !== '';
-      if (!staffOn) {
-        c.strokeStyle = nat ? col.gridStrong : col.grid;
-        c.lineWidth = pc === 0 ? 1.5 : 1;
+      const onStaff = !!staffSet && staffSet.has(m);
+      if (onStaff) {      // the five staff lines of the chosen clef stand out; every other semitone stays a quiet line
+        const dw = Math.max(1, Math.round(1.5 * dpr)), yy = (Math.round(y * dpr) + (dw % 2 ? 0.5 : 0)) / dpr;
+        c.strokeStyle = col.staff; c.globalAlpha = 0.8; c.lineWidth = dw / dpr;
+        c.beginPath(); c.moveTo(L, yy); c.lineTo(L + pw, yy); c.stroke();
+        c.globalAlpha = 1;
+      } else {
+        c.strokeStyle = nat || clefOn ? col.gridStrong : col.grid;
+        c.lineWidth = pc === 0 && !clefOn ? 1.5 : 1;
+        if (clefOn && !nat) c.setLineDash([2, 5]);     // with a clef, sharps and flats are dotted so the natural lines read as a ladder
         c.beginPath(); c.moveTo(L, y); c.lineTo(L + pw, y); c.stroke();
+        c.setLineDash([]);
       }
-      if (nat && !staffOn) labels.push({ y, pc, text: (state.names === 'solfege' ? SOL_NATURAL : NATURAL_LABEL)[pc] + (state.octNum ? Math.floor(m / 12) - 1 : '') });
+      if (nat) labels.push({ y, pc, onStaff, text: (state.names === 'solfege' ? SOL_NATURAL : NATURAL_LABEL)[pc] + (state.octNum ? Math.floor(m / 12) - 1 : '') });
     }
     // On a short plot some labels would collide: the octave markers (C or Do) always stay, the rest fill the gaps.
-    const shown = labels.filter((l) => l.pc === 0);
+    const shown = labels.filter((l) => l.pc === 0 || l.onStaff);
     for (const l of labels) if (l.pc !== 0 && shown.every((s) => Math.abs(s.y - l.y) >= 12)) shown.push(l);
-    for (const l of shown) { c.fillStyle = l.pc === 0 ? col.ink : col.muted; c.fillText(l.text, L - 8, l.y); }
+    for (const l of shown) { c.fillStyle = l.onStaff ? col.staff : l.pc === 0 && !clefOn ? col.ink : col.muted; c.fillText(l.text, L - 8, l.y); }
 
     c.lineWidth = 1;
     if (hasLyrics) drawLyrics(c, L, pw, T, ph, now, xOf, tL, tR, laneH - 4);
@@ -843,7 +848,7 @@
       }
     }
 
-    if (staffOn) drawStaff(c, L, pw, T, ph, yOf);
+    if (clefOn) drawClef(c, T, ph, yOf, 8);
 
     // Playhead (the right edge in the free tuner).
     c.strokeStyle = col.muted; c.lineWidth = score ? 1.5 : 1;
@@ -866,30 +871,6 @@
         const w = Math.max(2, x2 - x1 - 1);
         const active = n.start <= now && now < n.end;
         const a = active ? 1 : n.end <= now ? 0.35 : 0.75;
-        if (state.staff !== 'off') {
-          // Ledger lines for notes above or below the staff.
-          const s = stepOf(n.midi);
-          c.save();
-          c.strokeStyle = col.staff; c.globalAlpha = 0.7 * a; c.lineWidth = 1.5;
-          const ledger = (k) => { const ly = yOf(naturalMidi(k)); c.beginPath(); c.moveTo(x1 - 5, ly); c.lineTo(x1 + w + 5, ly); c.stroke(); };
-          const treble = state.staff === 'treble', top = treble ? 40 : 28, bot = treble ? 28 : 16;   // first ledger line above / below
-          if (s >= top) for (let k = top; k <= s; k += 2) ledger(k);
-          else if (s <= bot) for (let k = bot; k >= s; k -= 2) ledger(k);
-          c.restore();
-        }
-        if (state.staff !== 'off') {
-          const pc = ((n.midi % 12) + 12) % 12;
-          if (NATURAL_LABEL[pc] === '') {
-            const k = notes.indexOf(n), pv = k > 0 ? notes[k - 1] : null;
-            if (!pv || pv.midi !== n.midi || n.start - pv.end > 1.5) {   // not repeated right after the same note
-              c.save();
-              c.globalAlpha = a; c.fillStyle = col.ink; c.font = '600 ' + Math.round(clamp(h * 1.15, 12, 22)) + 'px ' + SANS;
-              c.textAlign = 'right'; c.textBaseline = 'middle';
-              c.fillText(flats ? '\u266d' : '\u266f', x1 - 2, y);
-              c.restore();
-            }
-          }
-        }
         roundRect(c, x1, y - h / 2, w, h, 4);
         c.globalAlpha = active ? 0.5 : 0.22 * a;
         c.fillStyle = tone; c.fill();
