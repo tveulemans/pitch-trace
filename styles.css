@@ -240,3 +240,10 @@
   body.focus .range-info, body.focus #loopRow, body.focus #syncBox { display: none !important; }
   body.focus .app { padding-block: 8px; gap: 8px; }
   body.focus .app > .plot { min-height: 0; }
+
+  .songrow { display: flex; align-items: center; gap: 10px 12px; flex: 1 1 260px; min-width: 0; }
+  .songrow #songField { flex: 1 1 auto; min-width: 0; }
+  .songrow #songField select { flex: 1 1 auto; min-width: 0; width: 100%; }
+  .songrow #load { margin-left: auto; white-space: nowrap; }
+  .transport .go { min-width: 0; padding: 11px 16px; }
+  body.focus .transport .opts { display: none !important; }

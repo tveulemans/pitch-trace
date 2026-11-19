@@ -248,6 +248,12 @@
     loop.on = loopOn.checked && loop.b - loop.a > 0.2;
     loopFrom.value = String(r.f); loopTo.value = String(r.t);
   }
+  // With a score loaded, the listening button lives next to Play (it stays in focus mode); otherwise it heads the controls.
+  function placeToggle() {
+    const ctl = document.querySelector('.controls');
+    if (!transportEl.hidden) restartBtn.after(toggleBtn); else ctl.prepend(toggleBtn);
+  }
+  new MutationObserver(placeToggle).observe(transportEl, { attributes: true, attributeFilter: ['hidden'] });
   function updateLoopUI() {
     const ok = !!score && !!song && !song.exercise && bars.length > 0;
     loopRow.hidden = !ok;
