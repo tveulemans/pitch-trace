@@ -94,10 +94,17 @@
 
   // Colors for the canvas come from the CSS tokens so both themes work.
   let col = {};
+  function mixHex(a, b, t) {
+    const p = (h) => { const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(h); if (!m) return null; let s = m[1]; if (s.length === 3) s = s.replace(/./g, '$&$&'); return [0, 2, 4].map((i) => parseInt(s.substr(i, 2), 16)); };
+    const x = p(a), y = p(b);
+    if (!x || !y) return a;
+    return '#' + x.map((v, i) => Math.round(v + (y[i] - v) * t).toString(16).padStart(2, '0')).join('');
+  }
   function readColors() {
     const cs = getComputedStyle(document.documentElement);
     const g = (n) => cs.getPropertyValue(n).trim();
-    col = { grid: g('--grid'), gridStrong: g('--grid-strong'), ink: g('--ink'), muted: g('--muted'), band: g('--band'), bandStrong: g('--band-strong'), accent: g('--accent'), good: g('--good'), warn: g('--warn'), bad: g('--bad'), panel: g('--panel'), staff: g('--staff') || g('--ink') };
+    col = { grid: g('--grid'), gridStrong: g('--grid-strong'), ink: g('--ink'), muted: g('--muted'), band: g('--band'), bandStrong: g('--band-strong'), accent: g('--accent'), good: g('--good'), warn: g('--warn'), bad: g('--bad'), panel: g('--panel'), staff: g('--ink') };
+    col.staff = mixHex(col.ink, col.accent, 0.4);   // staff lines: the text colour with a hint of the accent, so they sit quietly in the theme
   }
   readColors();
   const accentSel = $('accent');
@@ -499,14 +506,14 @@
     const yLo = yOf(lines[0]), yHi = yOf(lines[4]);
     c.save();
     c.beginPath(); c.rect(2, T, L + pw - 2, ph); c.clip();
-    c.strokeStyle = col.staff; c.fillStyle = col.staff; c.globalAlpha = 0.85;
+    c.strokeStyle = col.staff; c.fillStyle = col.staff; c.globalAlpha = 0.6;
     const dw = Math.max(1, Math.round(1.5 * dpr));          // line width in device pixels, so every staff line looks the same
     c.lineWidth = dw / dpr;
     for (const m of lines) { const y = (Math.round(yOf(m) * dpr) + (dw % 2 ? 0.5 : 0)) / dpr; c.beginPath(); c.moveTo(4, y); c.lineTo(L + pw, y); c.stroke(); }
     c.beginPath(); c.moveTo(L - 0.5, yHi); c.lineTo(L - 0.5, yLo); c.stroke();   // hairline closing the clef gutter
     const sp = (yLo - yHi) / 4;
     const u = Math.min(sp, (L - 14) / (treble ? 2.2 : 3.1));
-    c.globalAlpha = 0.95; c.lineCap = 'round'; c.lineJoin = 'round'; c.lineWidth = Math.max(1.5, u * 0.3);
+    c.globalAlpha = 0.85; c.lineCap = 'round'; c.lineJoin = 'round'; c.lineWidth = Math.max(1.5, u * 0.3);
     if (u >= 4 && !treble) {
       const x0 = 8, yF = yOf(53); // the clef curls around the F line
       c.beginPath();
