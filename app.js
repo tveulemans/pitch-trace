@@ -492,16 +492,18 @@
   const MONO = 'ui-monospace, Menlo, Consolas, monospace';
   const SANS = '"Avenir Next", "Segoe UI", Roboto, system-ui, sans-serif';
 
-  // The five lines of the bass clef (clé de fa) at their true pitch, with the clef on the left.
-  function drawBassStaff(c, L, pw, T, ph, yOf, clefW) {
+  // The five lines of the bass clef (clé de fa) at their true pitch, with a compact clef in the left gutter.
+  function drawBassStaff(c, L, pw, T, ph, yOf) {
     c.save();
-    c.beginPath(); c.rect(L, T, pw, ph); c.clip();
-    c.strokeStyle = col.ink; c.fillStyle = col.ink; c.globalAlpha = 0.5; c.lineWidth = 1.5;
-    for (const m of BASS_LINES) { const y = yOf(m); c.beginPath(); c.moveTo(L, y); c.lineTo(L + pw, y); c.stroke(); }
-    const u = Math.min((yOf(43) - yOf(57)) / 4, clefW / 3);
-    if (u >= 5) {
-      const x0 = L + 8, yF = yOf(53); // the clef curls around the F line
-      c.globalAlpha = 0.8; c.lineCap = 'round'; c.lineWidth = Math.max(1.5, u * 0.3);
+    c.beginPath(); c.rect(2, T, L + pw - 2, ph); c.clip();
+    c.strokeStyle = col.ink; c.fillStyle = col.ink; c.globalAlpha = 0.55; c.lineWidth = 1.25;
+    for (const m of BASS_LINES) { const y = Math.round(yOf(m)) + 0.5; c.beginPath(); c.moveTo(4, y); c.lineTo(L + pw, y); c.stroke(); }
+    // Hairline barline closing the clef gutter.
+    c.globalAlpha = 0.55; c.beginPath(); c.moveTo(L - 0.5, yOf(57)); c.lineTo(L - 0.5, yOf(43)); c.stroke();
+    const u = Math.min((yOf(43) - yOf(57)) / 4, (L - 14) / 3.1);
+    if (u >= 4) {
+      const x0 = 8, yF = yOf(53); // the clef curls around the F line
+      c.globalAlpha = 0.9; c.lineCap = 'round'; c.lineWidth = Math.max(1.5, u * 0.3);
       c.beginPath();
       c.moveTo(x0 + 0.35 * u, yF);
       c.bezierCurveTo(x0 + 0.35 * u, yF - 1.5 * u, x0 + 2.0 * u, yF - 1.3 * u, x0 + 1.9 * u, yF + 0.3 * u);
@@ -693,7 +695,8 @@
 
     const hasLyrics = !!(score && state.lyrics && state.lyricLane && lyricsOf().length);
     const laneH = hasLyrics ? 26 : 0;
-    const L = 44, R = 12, T = score ? 20 : 8, B = 18 + laneH;
+    const staffOn = !!score && state.staff === 'bass';
+    const L = staffOn ? 56 : 44, R = 12, T = score ? 20 : 8, B = 18 + laneH;
     const pw = cssW - L - R, ph = cssH - T - B;
     if (pw < 40 || ph < 40) return;
     const phx = score ? L + pw * PLAYHEAD : L + pw;
@@ -723,10 +726,12 @@
       const pc = ((m % 12) + 12) % 12;
       const y = yOf(m);
       const nat = NATURAL_LABEL[pc] !== '';
-      c.strokeStyle = nat ? col.gridStrong : col.grid;
-      c.lineWidth = pc === 0 ? 1.5 : 1;
-      c.beginPath(); c.moveTo(L, y); c.lineTo(L + pw, y); c.stroke();
-      if (nat) labels.push({ y, pc, text: (state.names === 'solfege' ? SOL_NATURAL : NATURAL_LABEL)[pc] + (Math.floor(m / 12) - 1) });
+      if (!staffOn) {
+        c.strokeStyle = nat ? col.gridStrong : col.grid;
+        c.lineWidth = pc === 0 ? 1.5 : 1;
+        c.beginPath(); c.moveTo(L, y); c.lineTo(L + pw, y); c.stroke();
+      }
+      if (nat && !staffOn) labels.push({ y, pc, text: (state.names === 'solfege' ? SOL_NATURAL : NATURAL_LABEL)[pc] + (Math.floor(m / 12) - 1) });
     }
     // On a short plot some labels would collide: the octave markers (C or Do) always stay, the rest fill the gaps.
     const shown = labels.filter((l) => l.pc === 0);
@@ -769,7 +774,7 @@
       }
     }
 
-    if (state.staff === 'bass') drawBassStaff(c, L, pw, T, ph, yOf, Math.min(phx - L - 14, pw * 0.22));
+    if (staffOn) drawBassStaff(c, L, pw, T, ph, yOf);
 
     // Playhead (the right edge in the free tuner).
     c.strokeStyle = col.muted; c.lineWidth = score ? 1.5 : 1;
@@ -801,6 +806,19 @@
           if (s >= 28) for (let k = 28; k <= s; k += 2) ledger(k);
           else if (s <= 16) for (let k = 16; k >= s; k -= 2) ledger(k);
           c.restore();
+        }
+        if (state.staff === 'bass') {
+          const pc = ((n.midi % 12) + 12) % 12;
+          if (NATURAL_LABEL[pc] === '') {
+            const k = notes.indexOf(n), pv = k > 0 ? notes[k - 1] : null;
+            if (!pv || pv.midi !== n.midi || n.start - pv.end > 1.5) {   // not repeated right after the same note
+              c.save();
+              c.globalAlpha = a; c.fillStyle = col.ink; c.font = '600 ' + Math.round(clamp(h * 1.15, 12, 22)) + 'px ' + SANS;
+              c.textAlign = 'right'; c.textBaseline = 'middle';
+              c.fillText(flats ? '\u266d' : '\u266f', x1 - 2, y);
+              c.restore();
+            }
+          }
         }
         roundRect(c, x1, y - h / 2, w, h, 4);
         c.globalAlpha = active ? 0.5 : 0.22 * a;
@@ -1686,7 +1704,17 @@
     closeSong();
   });
 
+  const focusBtn = $('focusBtn');
+  function setFocus(on) {
+    document.body.classList.toggle('focus', on);
+    focusBtn.setAttribute('aria-pressed', String(on));
+    focusBtn.setAttribute('aria-label', on ? 'Leave focus mode' : 'Focus mode: hide the controls');
+    try { if (on && document.documentElement.requestFullscreen && !document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {}); else if (!on && document.fullscreenElement) document.exitFullscreen().catch(() => {}); } catch (e) {}
+  }
+  focusBtn.addEventListener('click', () => setFocus(!document.body.classList.contains('focus')));
+  document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && document.body.classList.contains('focus')) setFocus(false); });
   document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && document.body.classList.contains('focus')) setFocus(false);
     if (e.code === 'Space' && !/^(SELECT|INPUT|BUTTON|SUMMARY|TEXTAREA)$/.test(document.activeElement.tagName)) {
       e.preventDefault();
       if (score) playBtn.click(); else toggleBtn.click();

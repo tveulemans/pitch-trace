@@ -50,6 +50,9 @@
 
   <div class="plot" id="plot">
     <canvas id="cv"></canvas>
+    <button class="focus-btn" id="focusBtn" type="button" aria-pressed="false" aria-label="Focus mode: hide the controls" title="Focus mode">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+    </button>
     <div class="empty" id="empty"><div class="empty-box"><p id="emptyText">Press Start listening and sing a note.</p>
         <div class="empty-actions"><button class="btn primary" id="emptyLoad" type="button">Load a score</button><button class="btn" id="emptyEx" type="button">Try an exercise</button><button class="btn primary" id="emptyStart" type="button" hidden>Start exercise</button></div></div></div>
   </div>
