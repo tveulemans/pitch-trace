@@ -518,7 +518,6 @@
       c.bezierCurveTo(x0 + 1.8 * u, yF + 1.6 * u, x0 + 1.0 * u, yF + 2.4 * u, x0 + 0.2 * u, yF + 3.0 * u);
       c.stroke();
       c.beginPath(); c.arc(x0 + 0.35 * u, yF, 0.36 * u, 0, Math.PI * 2); c.fill();
-      for (const m of [55, 51.5]) { c.beginPath(); c.arc(x0 + 2.7 * u, yOf(m), 0.15 * u + 0.5, 0, Math.PI * 2); c.fill(); }
     } else if (u >= 3) {
       // The clef winds around the G line: a spine with a loop at the top and a curl below the staff.
       const yG = yOf(67);
@@ -762,7 +761,7 @@
     const laneH = hasLyrics ? 26 : 0;
     const clefOn = !!score && state.staff !== 'off';
     const staffSet = clefOn ? new Set(state.staff === 'treble' ? TREBLE_LINES : BASS_LINES) : null;
-    const L = clefOn ? 62 : 44, R = 12, T = score ? 20 : 8, B = 18 + laneH;
+    const L = clefOn ? 54 : 44, R = 12, T = score ? 20 : 8, B = 18 + laneH;
     const pw = cssW - L - R, ph = cssH - T - B;
     if (pw < 40 || ph < 40) return;
     const phx = score ? L + pw * PLAYHEAD : L + pw;
@@ -850,7 +849,7 @@
       }
     }
 
-    if (clefOn) drawClef(c, T, ph, yOf, 8);
+    if (clefOn) drawClef(c, T, ph, yOf, 5);
 
     // Playhead (the right edge in the free tuner).
     c.strokeStyle = col.muted; c.lineWidth = score ? 1.5 : 1;
