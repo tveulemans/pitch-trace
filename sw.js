@@ -1,7 +1,7 @@
 /* Service worker for Pitch Trace.
  * Network first, so a new deploy shows up on the next load; the cache is the
  * offline fallback. Bump CACHE only if you rename or remove files. */
-const CACHE = 'pitch-trace-v22';
+const CACHE = 'pitch-trace-v23';
 const CORE = [
   './',
   'index.html',
@@ -39,7 +39,7 @@ self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
   event.respondWith(
-    fetch(req)
+    fetch(req.url, { cache: 'no-cache' })   // revalidate, so a script is never served from the browser's 10-minute HTTP cache
       .then((res) => {
         if (res && res.ok) {
           const copy = res.clone();
