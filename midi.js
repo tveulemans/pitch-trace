@@ -10,7 +10,7 @@
 
   const utf8 = typeof TextDecoder !== 'undefined' ? new TextDecoder('utf-8', { fatal: true }) : null;
   function decode(bytes) {
-    try { if (utf8) return utf8.decode(bytes); } catch (e) { /* not UTF-8, fall through */ }
+    try { if (utf8) return utf8.decode(bytes); } catch { /* not UTF-8, fall through */ }
     let s = '';
     for (let k = 0; k < bytes.length; k++) s += String.fromCharCode(bytes[k]); // Latin-1 for older files
     return s;

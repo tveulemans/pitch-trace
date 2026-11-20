@@ -44,7 +44,6 @@
       if (!nm) continue;
       const attrs = {};
       const re = /([^\s=]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g;
-      let a;
       body.slice(nm[0].length).replace(re, (m, k, v1, v2) => { attrs[k] = dec(v1 != null ? v1 : v2); return m; });
       const el = { name: nm[0], attrs, kids: [], text: '' };
       stack[stack.length - 1].kids.push(el);

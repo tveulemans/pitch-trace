@@ -114,7 +114,6 @@
   .lyric-line .cur { font-size: clamp(17px, 4.8vw, 24px); font-weight: 600; min-height: 1.25em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--ink); }
   .lyric-line .cur .past { color: var(--muted); }
   .lyric-line .cur .now { color: var(--accent-ink); background: var(--accent); border-radius: 4px; padding: 0 3px; margin: 0 -3px; }
-  .lyric-line .nxt { font-size: clamp(13px, 3.6vw, 16px); min-height: 1.25em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
   .lyric-line .cur.fixing span { cursor: pointer; border-bottom: 1px dotted var(--muted); }
   .lyric-line .cur.fixing { text-overflow: clip; }
   .lyric-line .fix { appearance: none; border: 0; background: transparent; color: var(--muted); font-size: 12px; text-decoration: underline; cursor: pointer; padding: 6px 0; }
@@ -206,9 +205,8 @@
   /* Lyrics strip: larger current syllable, soft edges, a short fade when the line changes */
   .lyric-line .cur span { display: inline-block; white-space: pre; transition: color .15s, background-color .15s, transform .15s; }
   .lyric-line .cur .now { transform: scale(1.12); box-shadow: 0 0 14px color-mix(in srgb, var(--accent) 45%, transparent); }
-  .lyric-line .cur, .lyric-line .nxt { -webkit-mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent); mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent); }
+  .lyric-line .cur { -webkit-mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent); mask-image: linear-gradient(90deg, transparent, #000 7%, #000 93%, transparent); }
   .lyric-line .cur.fixing, .lyric-line .cur.spelling { -webkit-mask-image: none; mask-image: none; }
-  .lyric-line .nxt { opacity: .75; }
   .lyric-line .cur.enter { animation: lineIn .25s ease-out; }
   @keyframes lineIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
 

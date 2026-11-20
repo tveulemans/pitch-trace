@@ -30,7 +30,7 @@
   try {
     const saved = JSON.parse(localStorage.getItem('pitchtrace.settings') || '{}');
     for (const k of PERSIST) if (saved[k] != null) state[k] = saved[k];
-  } catch (e) { /* storage unavailable: defaults apply */ }
+  } catch { /* storage unavailable: defaults apply */ }
   if (![6, 12, 24].includes(state.windowSec)) state.windowSec = 12;
   if (!(state.speed >= 0.25 && state.speed <= 1)) state.speed = 1;
   if (state.octave !== 'exact') state.octave = 'any';
@@ -61,11 +61,11 @@
       const out = {};
       for (const k of PERSIST) out[k] = state[k];
       localStorage.setItem('pitchtrace.settings', JSON.stringify(out));
-    } catch (e) { /* ignore */ }
+    } catch { /* ignore */ }
     if (syncReady) noteSettings();
   }
-  const lsGet = (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
-  const lsSet = (k, v) => { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) { /* ignore */ } };
+  const lsGet = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
+  const lsSet = (k, v) => { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch { /* ignore */ } };
 
   /* ---------- elements ---------- */
 
@@ -126,10 +126,6 @@
     return table[((midi % 12) + 12) % 12] + (state.octNum || keepOctave ? Math.floor(midi / 12) - 1 : '');
   };
   // Position of a note on the staff, counted in letter steps (C4 = 28, so each step is a line or a space).
-  const LETTER = { C: 0, D: 1, E: 2, F: 3, G: 4, A: 5, B: 6 };
-  const NATURAL_SEMI = [0, 2, 4, 5, 7, 9, 11];
-  const stepOf = (midi) => LETTER[(flats ? FLAT : SHARP)[((midi % 12) + 12) % 12][0]] + 7 * (Math.floor(midi / 12) - 1);
-  const naturalMidi = (step) => NATURAL_SEMI[step % 7] + 12 * (Math.floor(step / 7) + 1);
   const BASS_LINES = [43, 47, 50, 53, 57]; // G2 B2 D3 F3 A3
   const TREBLE_LINES = [64, 67, 71, 74, 77]; // E4 G4 B4 D5 F5
   const fmt = (sec) => { sec = Math.max(0, sec); return Math.floor(sec / 60) + ':' + String(Math.floor(sec % 60)).padStart(2, '0'); };
@@ -196,7 +192,7 @@
     osc.start(when); osc.stop(end + 0.02);
     const v = { osc, g, mine };
     voices.add(v);
-    osc.onended = () => { voices.delete(v); try { g.disconnect(); } catch (e) { /* already gone */ } };
+    osc.onended = () => { voices.delete(v); try { g.disconnect(); } catch { /* already gone */ } };
   }
 
   function click(when, accent) {
@@ -208,7 +204,7 @@
     g.gain.exponentialRampToValueAtTime(0.0001, when + 0.07);
     o.connect(g); g.connect(master);
     o.start(when); o.stop(when + 0.09);
-    o.onended = () => { try { g.disconnect(); } catch (e) { /* already gone */ } };
+    o.onended = () => { try { g.disconnect(); } catch { /* already gone */ } };
   }
 
   function stopVoices(filter) {
@@ -220,7 +216,7 @@
         v.g.gain.cancelScheduledValues(now);
         v.g.gain.setTargetAtTime(0, now, 0.01);
         v.osc.stop(now + 0.06);
-      } catch (e) { /* already stopped */ }
+      } catch { /* already stopped */ }
       voices.delete(v);
     }
   }
@@ -569,6 +565,7 @@
 
   /* The one-line lyric ticker: every syllable of the song sits on one strip that slides so the current syllable stays at a fixed
      spot (30% from the left). The sung part fills in step with the note; sung syllables dim; the next one is underlined. */
+  window.addEventListener('resize', () => { tickSi = -3; });   // re-anchor the ticker after a rotation or resize
   function updateTicker(now, ly, tickEl) {
     const track = tickEl.firstElementChild;
     if (!tickBuilt) {
@@ -941,7 +938,7 @@
     state.running = false;
     stopTime = wall();
     if (stream) stream.getTracks().forEach((t) => t.stop());
-    try { if (source) source.disconnect(); } catch (e) { /* already gone */ }
+    try { if (source) source.disconnect(); } catch { /* already gone */ }
     stream = null; source = null; analyser = null;
     toggleBtn.textContent = 'Start listening'; toggleBtn.dataset.on = 'false';
     setStatus('off', 'Microphone off');
@@ -1214,7 +1211,7 @@
   const fmtSemi = (v) => Math.abs(v).toFixed(1) + (Math.abs(v).toFixed(1) === '1.0' ? ' semitone' : ' semitones');
   // Only runs scored with this version are kept: earlier ones used another scale.
   let history = (() => {
-    try { const a = JSON.parse(lsGet(HKEY) || '[]'); return Array.isArray(a) ? a.filter((h) => h && h.v === 2 && typeof h.k === 'string' && Array.isArray(h.levels)) : []; } catch (e) { return []; }
+    try { const a = JSON.parse(lsGet(HKEY) || '[]'); return Array.isArray(a) ? a.filter((h) => h && h.v === 2 && typeof h.k === 'string' && Array.isArray(h.levels)) : []; } catch { return []; }
   })();
   let progSel = -1;
   levelSel.value = String(state.level);
@@ -1380,7 +1377,7 @@
     }
     const m = progMetric.value, spec = METRICS[m];
     const vals = list.map(spec.get);
-    let lo = 0, hi = 100, unit = '';
+    let lo = 0, hi = 100;
     if (m === 'distance') { hi = Math.max(2, Math.ceil(Math.max.apply(null, vals) / 2) * 2); }
     if (m === 'bias') { const a = Math.max(2, Math.ceil(Math.max.apply(null, vals.map(Math.abs)) / 2) * 2); lo = -a; hi = a; }
     if (m === 'wobble') { hi = Math.max(0.4, Math.ceil(Math.max.apply(null, vals) / 0.4) * 0.4); }
@@ -1532,7 +1529,7 @@
   exHi.addEventListener('change', () => { state.exHi = Number(exHi.value); if (state.exLo > state.exHi) { state.exLo = state.exHi; exLo.value = String(state.exLo); } save(); });
   exGo.addEventListener('click', () => {
     let ex;
-    try { ex = exercises.build(state.exercise, state.exLo, state.exHi, Math.floor(Math.random() * 1e9), { mode: state.exMode, seconds: state.exLen, variant: state.exVar }); } catch (e) { showMsg('That exercise could not be built.'); return; }
+    try { ex = exercises.build(state.exercise, state.exLo, state.exHi, Math.floor(Math.random() * 1e9), { mode: state.exMode, seconds: state.exLen, variant: state.exVar }); } catch { showMsg('That exercise could not be built.'); return; }
     const rec = { id: 'exercise', exId: state.exercise === 'single' ? 'hold:' + state.exMode : (ex.variantId || state.exercise), help: ex.help, lo: ex.lo, hi: ex.hi, name: ex.name, bytes: ex.bytes.buffer, added: Date.now(), pickup: 0, part: ex.partIndex || 0, exercise: true, callResponse: !!ex.callResponse };
     if (!openSong(rec)) return;
     exNote.textContent = ex.widened
@@ -1687,7 +1684,7 @@
     if (!f) return;
     if (f.size > 20 * 1024 * 1024) { showMsg('That file is too large to be a score.'); return; }
     let bytes;
-    try { bytes = await f.arrayBuffer(); } catch (e) { showMsg('That file could not be read.'); return; }
+    try { bytes = await f.arrayBuffer(); } catch { showMsg('That file could not be read.'); return; }
     // A MIDI file is used as it is. MusicXML and MuseScore files are first turned into MIDI, with every voice keeping its own lyrics.
     let imported = null;
     const head = new Uint8Array(bytes, 0, Math.min(4, bytes.byteLength));
@@ -1734,7 +1731,7 @@
     document.body.classList.toggle('focus', on);
     focusBtn.setAttribute('aria-pressed', String(on));
     focusBtn.setAttribute('aria-label', on ? 'Leave focus mode' : 'Focus mode: hide the controls');
-    try { if (on && document.documentElement.requestFullscreen && !document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {}); else if (!on && document.fullscreenElement) document.exitFullscreen().catch(() => {}); } catch (e) {}
+    try { if (on && document.documentElement.requestFullscreen && !document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {}); else if (!on && document.fullscreenElement) document.exitFullscreen().catch(() => {}); } catch {}
   }
   focusBtn.addEventListener('click', () => setFocus(!document.body.classList.contains('focus')));
   document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && document.body.classList.contains('focus')) setFocus(false); });
@@ -1764,7 +1761,7 @@
   const SKEY = 'pitchtrace.sync';
   const syncCfg = (() => {
     let c = {};
-    try { c = JSON.parse(lsGet(SKEY) || '{}') || {}; } catch (e) { c = {}; }
+    try { c = JSON.parse(lsGet(SKEY) || '{}') || {}; } catch { c = {}; }
     return Object.assign({ token: '', repo: 'tveulemans/pitch-trace-data', last: 0, settingsT: 0, settingsVals: '', cleared: {}, gone: {} }, c);
   })();
   function saveSyncCfg() { lsSet(SKEY, JSON.stringify(syncCfg)); }
@@ -1813,7 +1810,7 @@
     if (m.settings.t > syncCfg.settingsT) {
       for (const k of syncApi.SYNCED) if (k in m.settings.vals && JSON.stringify(state[k]) !== JSON.stringify(m.settings.vals[k])) { state[k] = m.settings.vals[k]; reload = true; }
       syncCfg.settingsT = m.settings.t; syncCfg.settingsVals = JSON.stringify(m.settings.vals);
-      try { const o = {}; for (const k of PERSIST) o[k] = state[k]; localStorage.setItem('pitchtrace.settings', JSON.stringify(o)); } catch (e) { /* ignore */ }
+      try { const o = {}; for (const k of PERSIST) o[k] = state[k]; localStorage.setItem('pitchtrace.settings', JSON.stringify(o)); } catch { /* ignore */ }
     }
     saveSyncCfg();
     return reload;
